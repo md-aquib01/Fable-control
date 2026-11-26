@@ -81,6 +81,7 @@ public class SettingsActivity extends Activity {
         list.addView(tag);
 
         setupCard();
+        layoutCard();
         triggerCard();
         lookCard();
         sectionsCard();
@@ -125,6 +126,48 @@ public class SettingsActivity extends Activity {
             if (CCService.instance != null && CCService.instance.panel != null) CCService.instance.panel.toggle();
             else start(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
         });
+    }
+
+    private void layoutCard() {
+        LinearLayout c = card("Layout");
+        toggle(c, "Notifications page", "Pull down shows the top rows, music and your notifications. Swipe sideways for the full control centre. With no notifications it opens the full centre.",
+                Prefs.NOTIF_PAGE, true);
+        if (appTiles == null) appTiles = AppTiles.load(this);
+        String[] pos = {"Top row, 3rd button", "Top row, 4th button", "Second row, 3rd button", "Second row, 4th button"};
+        for (int i = 0; i < 4; i++) {
+            final int slot = i;
+            String id = Prefs.slot(sp, i);
+            TextView val = text(labelOf(id) + "  ›", 14, accent, true);
+            row(c, pos[i], "Tap to choose any button, including other apps' tiles", val, () -> pickSlot(slot));
+        }
+    }
+
+    private String labelOf(String id) {
+        if (AppTiles.isApp(id)) {
+            AppTiles.T t = AppTiles.find(appTiles, id);
+            return t == null ? "Missing app" : t.label;
+        }
+        return Tiles.label(id);
+    }
+
+    private void pickSlot(int slot) {
+        ArrayList<String> ids = new ArrayList<>(Arrays.asList(Tiles.ALL));
+        for (AppTiles.T t : appTiles) ids.add(t.id);
+        String[] names = new String[ids.size()];
+        for (int i = 0; i < ids.size(); i++) {
+            String id = ids.get(i);
+            names[i] = AppTiles.isApp(id) ? labelOf(id) + "  (app)" : labelOf(id);
+        }
+        int cur = ids.indexOf(Prefs.slot(sp, slot));
+        new android.app.AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle("Choose a button")
+                .setSingleChoiceItems(names, cur, (d, which) -> {
+                    sp.edit().putString("slot" + slot, ids.get(which)).apply();
+                    d.dismiss();
+                    render();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     private void triggerCard() {
@@ -258,6 +301,7 @@ public class SettingsActivity extends Activity {
         LinearLayout c = card("Good to know");
         String[] tips = {
                 "Swipe up anywhere, tap empty space, or press back to close.",
+                "Swipe sideways (either way) to switch between notifications and the full control centre. Swipe a notification sideways to dismiss it.",
                 "Long-press brightness to switch auto-brightness. Long-press volume for all volume controls.",
                 "Long-press Wi-Fi, Bluetooth, Focus or Alarm to jump to their full settings.",
                 "Tap any button to switch it, hold it for its settings.",

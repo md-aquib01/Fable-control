@@ -63,18 +63,29 @@ final class MediaView extends View {
         invalidate();
     }
 
+    /** Wide = the one-row version used on the notifications page. */
+    private boolean wide() { return getWidth() > getHeight() * 1.6f; }
+
     @Override
     protected void onSizeChanged(int w, int h, int ow, int oh) {
         clip.reset();
-        float r = Math.min(w, h) * 0.2f * TileView.ROUNDNESS + w * 0.04f;
+        float r = wide() ? h * 0.5f * TileView.ROUNDNESS * 0.72f
+                : Math.min(w, h) * 0.2f * TileView.ROUNDNESS + w * 0.04f;
         clip.addRoundRect(0, 0, w, h, r, r, Path.Direction.CW);
         float pad = w * 0.1f, a = w * 0.36f;
+        if (wide()) { pad = h * 0.16f; a = h - 2 * pad; }
         artR.set(pad, pad, pad + a, pad + a);
         artClip.reset();
         artClip.addRoundRect(artR, a * 0.18f, a * 0.18f, Path.Direction.CW);
     }
 
-    private float pad() { return getWidth() * 0.1f; }
+    private float pad() { return wide() ? getHeight() * 0.16f : getWidth() * 0.1f; }
+
+    // control centres in wide mode (right-aligned prev / play / next)
+    private float wx(int zone) {
+        float h = getHeight(), right = getWidth() - h * 0.42f;
+        return zone == NEXT ? right : zone == PLAY ? right - h * 0.62f : right - h * 1.24f;
+    }
 
     private float ctrlY() { return getHeight() - pad() - getWidth() * 0.09f; }
 
@@ -110,6 +121,8 @@ final class MediaView extends View {
             dNote.draw(c);
         }
 
+        if (wide()) { drawWide(c, w, h); return; }
+
         // output button
         bg.setColor(pressedZone == OUTPUT ? 0x55FFFFFF : 0x2EFFFFFF);
         c.drawCircle(outX(), outY(), outR(), bg);
@@ -138,6 +151,25 @@ final class MediaView extends View {
         drawCtrl(c, dNext, w * 0.8f, cy, w * 0.11f, tint, NEXT);
     }
 
+    private void drawWide(Canvas c, int w, int h) {
+        float tx = artR.right + h * 0.2f, avail = wx(PREV) - h * 0.3f - tx;
+        tp.setTextSize(h * 0.2f);
+        ap.setTextSize(h * 0.17f);
+        CharSequence t = TextUtils.ellipsize(title, tp, avail, TextUtils.TruncateAt.END);
+        float cy = h / 2f;
+        if (artist.isEmpty()) {
+            c.drawText(t, 0, t.length(), tx, cy + tp.getTextSize() * 0.36f, tp);
+        } else {
+            c.drawText(t, 0, t.length(), tx, cy - h * 0.03f, tp);
+            CharSequence a = TextUtils.ellipsize(artist, ap, avail, TextUtils.TruncateAt.END);
+            c.drawText(a, 0, a.length(), tx, cy + h * 0.21f, ap);
+        }
+        int tint = hasSession ? 0xFFFFFFFF : 0x66FFFFFF;
+        drawCtrl(c, dPrev, wx(PREV), cy, h * 0.24f, tint, PREV);
+        drawCtrl(c, playing ? dPause : dPlay, wx(PLAY), cy, h * 0.28f, tint, PLAY);
+        drawCtrl(c, dNext, wx(NEXT), cy, h * 0.24f, tint, NEXT);
+    }
+
     private void drawCtrl(Canvas c, Drawable d, float cx, float cy, float size, int tint, int zone) {
         if (pressedZone == zone) {
             bg.setColor(0x26FFFFFF);
@@ -151,6 +183,11 @@ final class MediaView extends View {
 
     private int zoneAt(float x, float y) {
         int w = getWidth();
+        if (wide()) {
+            float hh = getHeight();
+            for (int z : new int[]{PREV, PLAY, NEXT}) if (Math.abs(x - wx(z)) < hh * 0.31f) return z;
+            return OPEN;
+        }
         if (Math.hypot(x - outX(), y - outY()) < outR() * 1.5f) return OUTPUT;
         if (Math.abs(y - ctrlY()) < w * 0.14f) {
             if (x < w * 0.35f) return PREV;

@@ -1,14 +1,18 @@
 package com.fable.control;
 
+import android.accessibilityservice.AccessibilityService;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.TimeInterpolator;
 import android.animation.ValueAnimator;
 import android.app.ActivityOptions;
 import android.app.AlarmManager;
+import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.UiModeManager;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothManager;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.ContentResolver;
@@ -16,10 +20,13 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
 import android.location.LocationManager;
@@ -35,6 +42,7 @@ import android.net.Uri;
 import android.net.wifi.WifiManager;
 import android.os.BatteryManager;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.PowerManager;
@@ -42,33 +50,39 @@ import android.os.SystemClock;
 import android.provider.AlarmClock;
 import android.provider.MediaStore;
 import android.provider.Settings;
-import android.accessibilityservice.AccessibilityService;
-import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothManager;
+import android.service.notification.StatusBarNotification;
 import android.text.format.DateFormat;
+import android.text.format.DateUtils;
 import android.util.DisplayMetrics;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
 import android.view.View;
 import android.view.WindowManager;
-import android.view.WindowMetrics;
 import android.view.accessibility.AccessibilityEvent;
+import android.view.animation.DecelerateInterpolator;
 import android.view.animation.PathInterpolator;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import java.lang.reflect.Method;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
-/** The control-center overlay: builds the layout, animates it and runs every tile. */
+/**
+ * The control-centre overlay. Two pages side by side:
+ * 0 = compact (top rows, music row, notifications), 1 = full control centre.
+ */
 final class Panel implements PanelRoot.Host {
 
-    /** Damped spring: quick start, tiny overshoot, settles softly. */
     private static final TimeInterpolator SPRING = t ->
             (float) (1 - Math.exp(-6.2 * t) * (Math.cos(4.6 * t) + 0.7 * Math.sin(4.6 * t)));
     private static final TimeInterpolator EASE_CLOSE = new PathInterpolator(0.4f, 0f, 0.2f, 1f);
@@ -81,25 +95,32 @@ final class Panel implements PanelRoot.Host {
 
     // views
     private PanelRoot root;
-    private View dim;
-    private FrameLayout content;
-    private TextView timeView, dateView, battView, hint;
-    private TileView wifi, bt, cell, air, hotspot, loc, focus, alarm, gear;
+    private View dim, dot0, dot1;
+    private FrameLayout stage, pageCompact, pageFull;
+    private TextView timeView, dateView, battView, hint, emptyView;
+    private LinearLayout notifList;
+    private ScrollView notifScroll;
     private SliderView bright, vol;
-    private MediaView media;
+    private MediaView compactMedia;
+    private final ArrayList<MediaView> medias = new ArrayList<>();
     private final ArrayList<View> rowViews = new ArrayList<>();
-    private final ArrayList<TileView> small = new ArrayList<>();
-    private final ArrayList<String> smallIds = new ArrayList<>();
+    private final LinkedHashMap<String, Multi> tiles = new LinkedHashMap<>();
     private List<AppTiles.T> appTiles = new ArrayList<>();
     private WindowManager.LayoutParams lp;
 
+    // geometry
+    private int W, H;
+    private float cw, g, u, hh, x0;
+
     // state
-    private boolean dirty = true, attached, registered, blurOk;
+    private boolean dirty = true, attached, registered, blurOk, pagesEnabled;
     private float progress;
     private ValueAnimator anim;
     private long openedAt;
-    private int maxBlur, lastBlur = -1, accent, lastVolIdx = -1, trigger;
+    private int maxBlur, lastBlur = -1, accent, lastVolIdx = -1, page = 1;
     private float dimAlpha;
+    private String notifSig = "";
+    private final HashMap<String, String> appNames = new HashMap<>();
 
     // system services
     private final AudioManager am;
@@ -113,6 +134,7 @@ final class Panel implements PanelRoot.Host {
     private String camId;
     private boolean torchOn;
     private MediaController mc;
+    private QsClicker qs;
 
     Panel(CCService service) {
         s = service;
@@ -140,7 +162,11 @@ final class Panel implements PanelRoot.Host {
     private final CameraManager.TorchCallback torchCb = new CameraManager.TorchCallback() {
         @Override
         public void onTorchModeChanged(String id, boolean enabled) {
-            if (id.equals(camId)) { torchOn = enabled; if (attached) refreshSmall(); }
+            if (id.equals(camId)) {
+                torchOn = enabled;
+                Multi m = tiles.get("flash");
+                if (m != null) m.setActive(enabled);
+            }
         }
     };
 
@@ -157,13 +183,10 @@ final class Panel implements PanelRoot.Host {
         try { cam.unregisterTorchCallback(torchCb); } catch (Exception ignored) { }
     }
 
-    // ------------------------------------------------------------------ layout
+    // ================================================================== layout
 
     private Rect screen() {
-        if (Build.VERSION.SDK_INT >= 30) {
-            WindowMetrics m = wm.getMaximumWindowMetrics();
-            return m.getBounds();
-        }
+        if (Build.VERSION.SDK_INT >= 30) return wm.getMaximumWindowMetrics().getBounds();
         DisplayMetrics dm = new DisplayMetrics();
         wm.getDefaultDisplay().getRealMetrics(dm);
         return new Rect(0, 0, dm.widthPixels, dm.heightPixels);
@@ -174,58 +197,86 @@ final class Panel implements PanelRoot.Host {
         return id > 0 ? s.getResources().getDimensionPixelSize(id) : dp(fallbackDp);
     }
 
+    private boolean listenerOn() {
+        String v = Settings.Secure.getString(s.getContentResolver(), "enabled_notification_listeners");
+        return v != null && v.contains(s.getPackageName());
+    }
+
+    private void geometry(float width) {
+        cw = width;
+        g = cw * 0.045f;
+        u = (cw - 3 * g) / 4f;
+        hh = u * 0.6f;
+        x0 = (W - cw) / 2f;
+    }
+
     private void build() {
         dirty = false;
         accent = Prefs.accent(sp);
-        trigger = sp.getInt(Prefs.TRIGGER, Prefs.TRIG_TOP_RIGHT);
         TileView.HAPTICS = sp.getBoolean(Prefs.HAPTICS, true);
         TileView.ROUNDNESS = sp.getInt(Prefs.ROUND, 100) / 100f;
         TileView.IDLE_BG = sp.getBoolean(Prefs.GLASS, true) ? 0x24FFFFFF : 0xA6161618;
         maxBlur = Math.round(sp.getInt(Prefs.BLUR, 60) / 100f * dp(40));
         dimAlpha = sp.getInt(Prefs.DIM, 45) / 100f;
+        tiles.clear();
+        rowViews.clear();
+        medias.clear();
+        bright = vol = null;
+        compactMedia = null;
+        notifList = null;
+        notifScroll = null;
+        notifSig = "";
 
-        appTiles = new ArrayList<>();
-        for (String id : Prefs.tiles(sp)) if (AppTiles.isApp(id)) { appTiles = AppTiles.load(s); break; }
+        boolean needApps = false;
+        for (String id : Prefs.tiles(sp)) if (AppTiles.isApp(id)) needApps = true;
+        for (int i = 0; i < 4; i++) if (AppTiles.isApp(Prefs.slot(sp, i))) needApps = true;
+        appTiles = needApps ? AppTiles.load(s) : new ArrayList<>();
 
         Rect b = screen();
-        int W = b.width(), H = b.height();
+        W = b.width();
+        H = b.height();
         int sbH = sysDimen("status_bar_height", 24);
         int navH = sysDimen("navigation_bar_height", 24);
+        pagesEnabled = sp.getBoolean(Prefs.NOTIF_PAGE, true) && listenerOn();
+
+        float margin = Math.max(dp(16), W * 0.07f);
+        float width = Math.min(W - 2 * margin, dp(420)) * sp.getInt(Prefs.SCALE, 100) / 100f;
+        width = Math.min(width, W - dp(12));
+        float top = sbH + dp(14);
+        float avail = H - top - navH - dp(60);
+        geometry(width);
+        float total = hh + g * 0.7f + placeFull(null, 0);
+        if (total > avail) geometry(width * avail / total);
 
         root = new PanelRoot(s, this);
         dim = new View(s);
         dim.setBackgroundColor(0xFF000000);
         root.addView(dim, new FrameLayout.LayoutParams(-1, -1));
+        stage = new FrameLayout(s);
+        stage.setClipChildren(false);
+        root.addView(stage, new FrameLayout.LayoutParams(-1, -1));
+        stage.setPivotX(W / 2f);
+        stage.setPivotY(top);
 
-        float margin = Math.max(dp(16), W * 0.07f);
-        float cw = Math.min(W - 2 * margin, dp(420)) * sp.getInt(Prefs.SCALE, 100) / 100f;
-        cw = Math.min(cw, W - dp(12));
-        float top = sbH + dp(14);
-        float avail = H - top - navH - dp(60);
-        float ch = place(cw, false);
-        if (ch > avail) { cw = cw * avail / ch; ch = place(cw, false); }
+        buildHeader(top);
+        float y0 = top + hh + g * 0.7f;
 
-        content = new FrameLayout(s);
-        content.setClipChildren(false);
-        content.setClipToPadding(false);
-        rowViews.clear();
-        small.clear();
-        smallIds.clear();
-        place(cw, true);
-        FrameLayout.LayoutParams clp = new FrameLayout.LayoutParams((int) cw, (int) Math.ceil(ch));
-        clp.leftMargin = (int) ((W - cw) / 2f);
-        clp.topMargin = (int) top;
-        root.addView(content, clp);
-        content.setPivotY(0);
-        content.setPivotX(cw / 2f);
+        pageFull = newPage();
+        placeFull(pageFull, y0);
+        if (pagesEnabled) {
+            pageCompact = newPage();
+            placeCompact(pageCompact, y0, H - navH - dp(8));
+        } else {
+            pageCompact = null;
+        }
 
         hint = new TextView(s);
         hint.setTextColor(0xFFFFFFFF);
         hint.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         hint.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         hint.setPadding(dp(16), dp(9), dp(16), dp(9));
-        android.graphics.drawable.GradientDrawable hb = new android.graphics.drawable.GradientDrawable();
-        hb.setColor(0xCC2C2C2E);
+        GradientDrawable hb = new GradientDrawable();
+        hb.setColor(0xE62C2C2E);
         hb.setCornerRadius(dp(20));
         hint.setBackground(hb);
         hint.setAlpha(0f);
@@ -236,8 +287,7 @@ final class Panel implements PanelRoot.Host {
         lp = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
-                        | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
                 PixelFormat.TRANSLUCENT);
         lp.gravity = Gravity.TOP | Gravity.START;
         lp.windowAnimations = 0;
@@ -247,76 +297,59 @@ final class Panel implements PanelRoot.Host {
         if (Build.VERSION.SDK_INT >= 30) lp.setFitInsetsTypes(0);
     }
 
-    /** Lays out (or just measures) the panel for a content width; returns its height. */
-    private float place(float cw, boolean make) {
-        float g = cw * 0.045f, u = (cw - 3 * g) / 4f, y = 0;
-        int row = 0;
+    private FrameLayout newPage() {
+        FrameLayout f = new FrameLayout(s);
+        f.setClipChildren(false);
+        stage.addView(f, new FrameLayout.LayoutParams(W, -1));
+        return f;
+    }
 
-        float hh = u * 0.6f;
-        if (make) {
-            timeView = text(u * 0.3f, 0xFFFFFFFF, "sans-serif-medium");
-            add(timeView, 0, 0, cw * 0.5f, hh * 0.62f, row);
-            dateView = text(u * 0.16f, 0x99FFFFFF, "sans-serif");
-            add(dateView, 0, hh * 0.6f, cw * 0.5f, hh * 0.4f, row);
-            gear = new TileView(s, TileView.ROUND);
-            gear.setIcon(R.drawable.ic_tune);
-            gear.onClick = () -> launch(new Intent(s, SettingsActivity.class));
-            add(gear, cw - hh * 0.8f, hh * 0.1f, hh * 0.8f, hh * 0.8f, row);
-            battView = text(u * 0.17f, 0xFFFFFFFF, "sans-serif-medium");
-            battView.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-            add(battView, cw * 0.4f, 0, cw * 0.6f - hh * 0.8f - g * 0.7f, hh, row);
-        }
-        y += hh + g * 0.7f;
-        row++;
+    private void buildHeader(float top) {
+        timeView = text(u * 0.3f, 0xFFFFFFFF, "sans-serif-medium");
+        addAbs(stage, timeView, x0, top, cw * 0.55f, hh * 0.62f, 0);
+        dateView = text(u * 0.16f, 0x99FFFFFF, "sans-serif");
+        addAbs(stage, dateView, x0, top + hh * 0.6f, cw * 0.55f, hh * 0.4f, 0);
+        TileView gear = new TileView(s, TileView.ROUND);
+        gear.setIcon(R.drawable.ic_tune);
+        gear.onClick = () -> launch(new Intent(s, SettingsActivity.class));
+        addAbs(stage, gear, x0 + cw - hh * 0.8f, top + hh * 0.1f, hh * 0.8f, hh * 0.8f, 0);
+        battView = text(u * 0.17f, 0xFFFFFFFF, "sans-serif-medium");
+        battView.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+        addAbs(stage, battView, x0 + cw * 0.45f, top, cw * 0.55f - hh * 0.8f - g * 0.7f, hh, 0);
+        if (pagesEnabled) {
+            float d = dp(6);
+            dot0 = dot();
+            dot1 = dot();
+            addAbs(stage, dot0, W / 2f - d * 1.6f, top + hh * 0.5f - d / 2, d, d, 0);
+            addAbs(stage, dot1, W / 2f + d * 0.6f, top + hh * 0.5f - d / 2, d, d, 0);
+        } else dot0 = dot1 = null;
+    }
 
+    private View dot() {
+        View v = new View(s);
+        GradientDrawable d = new GradientDrawable();
+        d.setShape(GradientDrawable.OVAL);
+        d.setColor(0xFFFFFFFF);
+        v.setBackground(d);
+        return v;
+    }
+
+    /** Full control centre. With parent == null it only measures and returns the height. */
+    private float placeFull(FrameLayout p, float y) {
+        float start = y;
+        int row = 1;
         if (sp.getBoolean(Prefs.SEC_CONN, true)) {
-            if (make) {
-                wifi = wide(R.drawable.ic_wifi, "Wi-Fi", accent);
-                wifi.onClick = this::toggleWifi;
-                wifi.onLongClick = () -> launch(new Intent(Settings.ACTION_WIFI_SETTINGS));
-                add(wifi, 0, y, 2 * u + g, u, row);
-
-                cell = round(R.drawable.ic_cell, 0xFF30D158, 0xFFFFFFFF);
-                cell.setTitle("Mobile data");
-                cell.onClick = this::toggleData;
-                cell.onLongClick = () -> launchAny(new Intent(Settings.ACTION_NETWORK_OPERATOR_SETTINGS), new Intent(Settings.ACTION_DATA_ROAMING_SETTINGS));
-                add(cell, 2 * (u + g), y, u, u, row);
-
-                air = round(R.drawable.ic_airplane, 0xFFFF9F0A, 0xFFFFFFFF);
-                air.setTitle("Airplane mode");
-                air.onClick = this::toggleAirplane;
-                air.onLongClick = () -> launch(new Intent(Settings.ACTION_AIRPLANE_MODE_SETTINGS));
-                add(air, 3 * (u + g), y, u, u, row);
-
-                bt = wide(R.drawable.ic_bluetooth, "Bluetooth", accent);
-                bt.onClick = this::toggleBt;
-                bt.onLongClick = () -> launch(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS));
-                add(bt, 0, y + u + g, 2 * u + g, u, row + 1);
-
-                hotspot = round(R.drawable.ic_hotspot, 0xFF30D158, 0xFFFFFFFF);
-                hotspot.setTitle("Hotspot");
-                hotspot.onClick = this::toggleHotspot;
-                hotspot.onLongClick = this::openTether;
-                add(hotspot, 2 * (u + g), y + u + g, u, u, row + 1);
-
-                loc = round(R.drawable.ic_location, accent, onColor(accent));
-                loc.setTitle("Location");
-                loc.onClick = this::toggleLocation;
-                loc.onLongClick = () -> launch(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));
-                add(loc, 3 * (u + g), y + u + g, u, u, row + 1);
-            }
+            if (p != null) connBlock(p, y, row);
             y += 2 * u + 2 * g;
             row += 2;
-        } else if (make) {
-            wifi = bt = cell = air = hotspot = loc = null;
         }
-
         if (sp.getBoolean(Prefs.SEC_MEDIA, true)) {
             float mh = 2 * u + g;
-            if (make) {
-                media = new MediaView(s);
-                media.listener = this::mediaAct;
-                add(media, 0, y, 2 * u + g, mh, row);
+            if (p != null) {
+                MediaView mv = new MediaView(s);
+                mv.listener = this::mediaAct;
+                medias.add(mv);
+                add(p, mv, 0, y, 2 * u + g, mh, row);
 
                 bright = new SliderView(s);
                 bright.setIcon(R.drawable.ic_sun);
@@ -326,7 +359,7 @@ final class Panel implements PanelRoot.Host {
                     @Override public void release() { }
                     @Override public void longPress() { toggleAutoBrightness(); }
                 };
-                add(bright, 2 * (u + g), y, u, mh, row);
+                add(p, bright, 2 * (u + g), y, u, mh, row);
 
                 vol = new SliderView(s);
                 vol.setIcon(R.drawable.ic_volume);
@@ -336,57 +369,150 @@ final class Panel implements PanelRoot.Host {
                     @Override public void release() { }
                     @Override public void longPress() { launchPanel("android.settings.panel.action.VOLUME", Settings.ACTION_SOUND_SETTINGS); }
                 };
-                add(vol, 3 * (u + g), y, u, mh, row);
+                add(p, vol, 3 * (u + g), y, u, mh, row);
             }
             y += mh + g;
             row += 2;
-        } else if (make) {
-            media = null; bright = vol = null;
         }
-
         if (sp.getBoolean(Prefs.SEC_FOCUS, true)) {
-            if (make) {
-                focus = wide(R.drawable.ic_moon, "Focus", 0xFF5E5CE6);
-                focus.onClick = this::toggleDnd;
-                focus.onLongClick = () -> launchAny(new Intent("android.settings.ZEN_MODE_SETTINGS"),
-                        new Intent(Settings.ACTION_SOUND_SETTINGS));
-                add(focus, 0, y, 2 * u + g, u, row);
-
-                alarm = wide(R.drawable.ic_alarm, "Alarm", 0xFFFF9F0A);
-                alarm.onClick = () -> launch(new Intent(AlarmClock.ACTION_SHOW_ALARMS));
-                alarm.onLongClick = () -> launch(new Intent(AlarmClock.ACTION_SET_ALARM));
-                add(alarm, 2 * (u + g), y, 2 * u + g, u, row);
+            if (p != null) {
+                add(p, wideTile("focus"), 0, y, 2 * u + g, u, row);
+                add(p, wideTile("alarm"), 2 * (u + g), y, 2 * u + g, u, row);
             }
             y += u + g;
             row++;
-        } else if (make) {
-            focus = alarm = null;
         }
-
-        String[] ids = Prefs.tiles(sp);
         int n = 0;
-        for (String id : ids) {
-            if (id.isEmpty()) continue;
-            AppTiles.T at = AppTiles.isApp(id) ? AppTiles.find(appTiles, id) : null;
-            if (AppTiles.isApp(id) && at == null) continue;
+        for (String id : Prefs.tiles(sp)) {
+            if (!valid(id)) continue;
             int col = n % 4, r = n / 4;
-            if (make) {
-                TileView t = round(at == null ? Tiles.icon(id) : R.drawable.ic_gear, 0xFFFFFFFF, iconOnColor(id));
-                if (at != null) {
-                    t.setIconDrawable(at.icon, at.tint);
-                    t.setTitle(at.label);
-                } else t.setTitle(Tiles.label(id));
-                final String tid = id;
-                t.onClick = () -> clickSmall(tid, t);
-                t.onLongClick = () -> longSmall(tid);
-                add(t, col * (u + g), y + r * (u + g), u, u, row + r);
-                small.add(t);
-                smallIds.add(id);
-            }
+            if (p != null) add(p, roundTile(id), col * (u + g), y + r * (u + g), u, u, row + r);
             n++;
         }
         y += ((n + 3) / 4) * (u + g);
-        return Math.max(y - g, hh);
+        return Math.max(y - g - start, 0);
+    }
+
+    private void connBlock(FrameLayout p, float y, int row) {
+        add(p, wideTile("wifi"), 0, y, 2 * u + g, u, row);
+        add(p, wideTile("bt"), 0, y + u + g, 2 * u + g, u, row + 1);
+        for (int i = 0; i < 4; i++) {
+            String id = Prefs.slot(sp, i);
+            if (!valid(id)) id = Prefs.DEFAULT_SLOTS[i];
+            float x = (2 + i % 2) * (u + g), yy = y + (i / 2) * (u + g);
+            add(p, roundTile(id), x, yy, u, u, row + i / 2);
+        }
+    }
+
+    /** Compact page: the two top rows, a one-row music player (when something's playing) and notifications. */
+    private void placeCompact(FrameLayout p, float y, float bottom) {
+        connBlock(p, y, 1);
+        y += 2 * u + 2 * g;
+
+        LinearLayout col = new LinearLayout(s);
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.setClipChildren(false);
+        add(p, col, 0, y, cw, bottom - y, 3);
+
+        compactMedia = new MediaView(s);
+        compactMedia.listener = this::mediaAct;
+        compactMedia.setVisibility(View.GONE);
+        medias.add(compactMedia);
+        LinearLayout.LayoutParams mlp = new LinearLayout.LayoutParams(-1, Math.round(u));
+        mlp.bottomMargin = Math.round(g);
+        col.addView(compactMedia, mlp);
+
+        LinearLayout head = new LinearLayout(s);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.setPadding(Math.round(u * 0.08f), Math.round(g * 0.2f), 0, Math.round(g * 0.6f));
+        TextView ht = text(u * 0.2f, 0xFFFFFFFF, "sans-serif-medium");
+        ht.setText("Notifications");
+        head.addView(ht, new LinearLayout.LayoutParams(0, -2, 1f));
+        TextView clear = text(u * 0.16f, 0xCCFFFFFF, "sans-serif-medium");
+        clear.setText("Clear all");
+        clear.setPadding(Math.round(u * 0.18f), Math.round(u * 0.08f), Math.round(u * 0.18f), Math.round(u * 0.08f));
+        GradientDrawable cb = new GradientDrawable();
+        cb.setColor(TileView.IDLE_BG);
+        cb.setCornerRadius(u);
+        clear.setBackground(cb);
+        clear.setOnClickListener(v -> clearAll());
+        head.addView(clear);
+        col.addView(head);
+
+        notifScroll = new ScrollView(s);
+        notifScroll.setVerticalScrollBarEnabled(false);
+        notifScroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        notifScroll.setClipToPadding(false);
+        notifScroll.setPadding(0, 0, 0, dp(24));
+        notifList = new LinearLayout(s);
+        notifList.setOrientation(LinearLayout.VERTICAL);
+        notifScroll.addView(notifList, new FrameLayout.LayoutParams(-1, -2));
+        col.addView(notifScroll, new LinearLayout.LayoutParams(-1, 0, 1f));
+
+        emptyView = text(u * 0.17f, 0x80FFFFFF, "sans-serif");
+        emptyView.setText("No notifications");
+        emptyView.setGravity(Gravity.CENTER);
+        emptyView.setPadding(0, Math.round(u * 0.6f), 0, 0);
+    }
+
+    // ----------------------------------------------------------------- tile factory
+
+    private boolean valid(String id) {
+        if (id == null || id.isEmpty()) return false;
+        if (AppTiles.isApp(id)) return AppTiles.find(appTiles, id) != null;
+        for (String a : Tiles.ALL) if (a.equals(id)) return true;
+        return false;
+    }
+
+    private Multi multi(String id) {
+        Multi m = tiles.get(id);
+        if (m == null) { m = new Multi(); tiles.put(id, m); }
+        return m;
+    }
+
+    private TileView wideTile(String id) {
+        TileView t = new TileView(s, TileView.WIDE);
+        switch (id) {
+            case "wifi": t.setIcon(R.drawable.ic_wifi); t.setTitle("Wi-Fi"); t.onBg = accent; break;
+            case "bt": t.setIcon(R.drawable.ic_bluetooth); t.setTitle("Bluetooth"); t.onBg = accent; break;
+            case "focus": t.setIcon(R.drawable.ic_moon); t.setTitle("Focus"); t.onBg = 0xFF5E5CE6; break;
+            case "alarm": t.setIcon(R.drawable.ic_alarm); t.setTitle("Alarm"); t.onBg = 0xFFFF9F0A; break;
+        }
+        t.onFg = onColor(t.onBg);
+        t.onClick = () -> click(id);
+        t.onLongClick = () -> longClick(id);
+        multi(id).views.add(t);
+        return t;
+    }
+
+    private TileView roundTile(String id) {
+        TileView t = new TileView(s, TileView.ROUND);
+        switch (id) {
+            case "cell": t.setIcon(R.drawable.ic_cell); t.onBg = 0xFF30D158; t.onFg = 0xFFFFFFFF; break;
+            case "air": t.setIcon(R.drawable.ic_airplane); t.onBg = 0xFFFF9F0A; t.onFg = 0xFFFFFFFF; break;
+            case "hotspot": t.setIcon(R.drawable.ic_hotspot); t.onBg = 0xFF30D158; t.onFg = 0xFFFFFFFF; break;
+            case "location": t.setIcon(R.drawable.ic_location); t.onBg = accent; t.onFg = onColor(accent); break;
+            default: {
+                AppTiles.T at = AppTiles.isApp(id) ? AppTiles.find(appTiles, id) : null;
+                if (at != null) t.setIconDrawable(at.icon, at.tint);
+                else t.setIcon(Tiles.icon(id));
+                t.onBg = 0xFFFFFFFF;
+                t.onFg = iconOnColor(id);
+            }
+        }
+        t.setTitle(label(id));
+        t.onClick = () -> click(id);
+        t.onLongClick = () -> longClick(id);
+        multi(id).views.add(t);
+        return t;
+    }
+
+    private String label(String id) {
+        if (AppTiles.isApp(id)) {
+            AppTiles.T at = AppTiles.find(appTiles, id);
+            return at == null ? id : at.label;
+        }
+        return Tiles.label(id);
     }
 
     private int iconOnColor(String id) {
@@ -400,7 +526,6 @@ final class Panel implements PanelRoot.Host {
     }
 
     private static int darken(int c) {
-        // keep bright accents readable on the white "on" circle
         int r = (c >> 16) & 255, g = (c >> 8) & 255, b = c & 255;
         float lum = (0.299f * r + 0.587f * g + 0.114f * b) / 255f;
         if (lum < 0.62f) return c;
@@ -410,23 +535,6 @@ final class Panel implements PanelRoot.Host {
     private static int onColor(int bg) {
         int r = (bg >> 16) & 255, g = (bg >> 8) & 255, b = bg & 255;
         return (0.299f * r + 0.587f * g + 0.114f * b) > 186 ? 0xFF000000 : 0xFFFFFFFF;
-    }
-
-    private TileView round(int icon, int onBg, int onFg) {
-        TileView t = new TileView(s, TileView.ROUND);
-        t.setIcon(icon);
-        t.onBg = onBg;
-        t.onFg = onFg;
-        return t;
-    }
-
-    private TileView wide(int icon, String title, int onBg) {
-        TileView t = new TileView(s, TileView.WIDE);
-        t.setIcon(icon);
-        t.setTitle(title);
-        t.onBg = onBg;
-        t.onFg = onColor(onBg);
-        return t;
     }
 
     private TextView text(float px, int color, String family) {
@@ -440,16 +548,21 @@ final class Panel implements PanelRoot.Host {
         return v;
     }
 
-    private void add(View v, float x, float y, float w, float h, int row) {
-        FrameLayout.LayoutParams p = new FrameLayout.LayoutParams(Math.round(w), Math.round(h));
-        p.leftMargin = Math.round(x);
-        p.topMargin = Math.round(y);
+    /** Adds inside a page, x relative to the content column. */
+    private void add(FrameLayout p, View v, float x, float y, float w, float hgt, int row) {
+        addAbs(p, v, x0 + x, y, w, hgt, row);
+    }
+
+    private void addAbs(FrameLayout p, View v, float x, float y, float w, float hgt, int row) {
+        FrameLayout.LayoutParams lpp = new FrameLayout.LayoutParams(Math.round(w), Math.round(hgt));
+        lpp.leftMargin = Math.round(x);
+        lpp.topMargin = Math.round(y);
         v.setTag(row);
-        content.addView(v, p);
+        p.addView(v, lpp);
         rowViews.add(v);
     }
 
-    // ------------------------------------------------------------------ show / hide
+    // ================================================================== show / hide
 
     private void attach() {
         if (dirty || root == null) {
@@ -466,6 +579,9 @@ final class Panel implements PanelRoot.Host {
         refresh();
         register();
         if (!attached) {
+            // Notifications waiting → compact page; nothing to show → straight to the full centre.
+            int count = pagesEnabled && notifList != null ? countNotifs() : 0;
+            setPage(pagesEnabled && count > 0 ? 0 : 1);
             setProgress(0);
             try {
                 wm.addView(root, lp);
@@ -486,8 +602,8 @@ final class Panel implements PanelRoot.Host {
         }
         attached = false;
         lastBlur = -1;
-        if (content != null) content.setLayerType(View.LAYER_TYPE_NONE, null);
-        if (dirty) { root = null; }
+        if (stage != null) stage.setLayerType(View.LAYER_TYPE_NONE, null);
+        if (dirty) root = null;
     }
 
     void closeNow() { detach(); }
@@ -497,14 +613,12 @@ final class Panel implements PanelRoot.Host {
         else { attach(); animateTo(1f, 0); }
     }
 
-    void close() {
-        if (attached) animateTo(0f, 0);
-    }
+    void close() { if (attached) animateTo(0f, 0); }
 
     void beginOpen() {
         if (anim != null) { anim.removeAllListeners(); anim.cancel(); }
         attach();
-        if (content != null) content.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+        if (stage != null) stage.setLayerType(View.LAYER_TYPE_HARDWARE, null);
     }
 
     void dragOpen(float dist) {
@@ -514,7 +628,7 @@ final class Panel implements PanelRoot.Host {
     }
 
     void endOpen(float velocity) {
-        float vd = velocity / density; // dp per second, + is opening
+        float vd = velocity / density;
         boolean open = vd > 450 || (progress > 0.33f && vd > -250);
         animateTo(open ? 1f : 0f, vd);
     }
@@ -534,23 +648,23 @@ final class Panel implements PanelRoot.Host {
             @Override
             public void onAnimationEnd(Animator a) {
                 if (target == 0f) detach();
-                else if (content != null) content.setLayerType(View.LAYER_TYPE_NONE, null);
+                else if (stage != null) stage.setLayerType(View.LAYER_TYPE_NONE, null);
             }
         });
-        if (content != null) content.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+        if (stage != null) stage.setLayerType(View.LAYER_TYPE_HARDWARE, null);
         anim.start();
     }
 
     private void setProgress(float p) {
         progress = p;
-        if (content == null) return;
+        if (stage == null) return;
         float e = clamp(p);
         dim.setAlpha(e * (blurOk ? dimAlpha : Math.max(dimAlpha, 0.55f)));
-        content.setAlpha(clamp(e * 1.7f - 0.15f));
+        stage.setAlpha(clamp(e * 1.7f - 0.15f));
         float sc = p > 1 ? 1f + Math.min(0.03f, (p - 1) * 0.12f) : 0.86f + 0.14f * e;
-        content.setScaleX(sc);
-        content.setScaleY(sc);
-        content.setTranslationY(-(1 - e) * dp(28));
+        stage.setScaleX(sc);
+        stage.setScaleY(sc);
+        stage.setTranslationY(-(1 - e) * dp(28));
         for (View v : rowViews) {
             int r = (Integer) v.getTag();
             float d = Math.min(0.45f, r * 0.055f);
@@ -567,22 +681,109 @@ final class Panel implements PanelRoot.Host {
         }
     }
 
+    // ================================================================== pages
+
+    private FrameLayout cur() { return page == 0 ? pageCompact : pageFull; }
+
+    private FrameLayout other() { return page == 0 ? pageFull : pageCompact; }
+
+    private void setPage(int p) {
+        if (!pagesEnabled || pageCompact == null) { page = 1; pageFull.setTranslationX(0); return; }
+        page = p;
+        cur().animate().cancel();
+        other().animate().cancel();
+        cur().setTranslationX(0);
+        other().setTranslationX(W);
+        dots(0);
+    }
+
+    /** f = how far we are towards the other page (0..1). */
+    private void dots(float f) {
+        if (dot0 == null) return;
+        float a = page == 0 ? 1 - f : f;          // weight of compact page
+        dot0.setAlpha(0.35f + 0.65f * a);
+        dot1.setAlpha(0.35f + 0.65f * (1 - a));
+    }
+
+    @Override
+    public boolean canPage(float rawX, float rawY) {
+        if (!pagesEnabled || pageCompact == null) return false;
+        if (page == 0 && notifList != null) {
+            // Cards use sideways swipes to dismiss; everywhere else switches page.
+            for (int i = 0; i < notifList.getChildCount(); i++) {
+                View c = notifList.getChildAt(i);
+                if (c instanceof NotifCard && inside(c, rawX, rawY)) return false;
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public boolean blocksClose(float rawX, float rawY) {
+        return page == 0 && notifScroll != null && inside(notifScroll, rawX, rawY)
+                && notifScroll.canScrollVertically(1);
+    }
+
+    private static boolean inside(View v, float x, float y) {
+        if (v == null || !v.isShown()) return false;
+        int[] loc = new int[2];
+        v.getLocationOnScreen(loc);
+        return x >= loc[0] && x < loc[0] + v.getWidth() && y >= loc[1] && y < loc[1] + v.getHeight();
+    }
+
+    @Override
+    public void onPageDragStart() {
+        cur().animate().cancel();
+        other().animate().cancel();
+    }
+
+    @Override
+    public void onPageDrag(float dx) {
+        // The other page follows from whichever side you're pulling away from.
+        cur().setTranslationX(dx);
+        other().setTranslationX(dx > 0 ? dx - W : dx + W);
+        dots(Math.min(1f, Math.abs(dx) / W));
+    }
+
+    @Override
+    public void onPageDragEnd(float vx) {
+        float dx = cur().getTranslationX();
+        boolean go = Math.abs(dx) > W * 0.22f || (Math.abs(vx) > dp(600) && Math.signum(vx) == Math.signum(dx) && dx != 0);
+        DecelerateInterpolator di = new DecelerateInterpolator(1.6f);
+        if (go) {
+            float sign = Math.signum(dx);
+            cur().animate().translationX(sign * W).setDuration(260).setInterpolator(di).start();
+            other().animate().translationX(0).setDuration(260).setInterpolator(di).start();
+            page = 1 - page;
+            TileView.buzz(root, HapticFeedbackConstants.CLOCK_TICK);
+            if (dot0 != null) {
+                dot0.animate().alpha(page == 0 ? 1f : 0.35f).setDuration(200).start();
+                dot1.animate().alpha(page == 1 ? 1f : 0.35f).setDuration(200).start();
+            }
+        } else {
+            cur().animate().translationX(0).setDuration(240).setInterpolator(di).start();
+            other().animate().translationX(dx > 0 ? -W : W).setDuration(240).setInterpolator(di).start();
+            if (dot0 != null) {
+                dot0.animate().alpha(page == 0 ? 1f : 0.35f).setDuration(200).start();
+                dot1.animate().alpha(page == 1 ? 1f : 0.35f).setDuration(200).start();
+            }
+        }
+    }
+
     // PanelRoot.Host --------------------------------------------------
 
     @Override
     public void onDragStart() {
         if (anim != null) { anim.removeAllListeners(); anim.cancel(); }
-        content.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+        stage.setLayerType(View.LAYER_TYPE_HARDWARE, null);
     }
 
     @Override
-    public void onDrag(float up) {
-        setProgress(Math.max(0f, 1f - up / dp(300)));
-    }
+    public void onDrag(float up) { setProgress(Math.max(0f, 1f - up / dp(300))); }
 
     @Override
     public void onDragEnd(float vy) {
-        float vd = vy / density; // negative = flinging up
+        float vd = vy / density;
         boolean close = vd < -500 || (progress < 0.72f && vd < 300);
         animateTo(close ? 0f : 1f, vd);
     }
@@ -604,7 +805,7 @@ final class Panel implements PanelRoot.Host {
         close();
     }
 
-    // ------------------------------------------------------------------ live state
+    // ================================================================== live state
 
     private final BroadcastReceiver rx = new BroadcastReceiver() {
         @Override
@@ -614,6 +815,7 @@ final class Panel implements PanelRoot.Host {
         }
     };
     private final Runnable refreshRun = this::refresh;
+    private final Runnable notifRun = this::renderNotifs;
 
     private final MediaSessionManager.OnActiveSessionsChangedListener sessions = list -> bindMedia();
 
@@ -640,15 +842,17 @@ final class Panel implements PanelRoot.Host {
         f.addAction(LocationManager.PROVIDERS_CHANGED_ACTION);
         f.addAction(AlarmManager.ACTION_NEXT_ALARM_CLOCK_CHANGED);
         f.addAction("android.net.wifi.WIFI_AP_STATE_CHANGED");
+        f.addAction("android.nfc.action.ADAPTER_STATE_CHANGED");
         try {
             if (Build.VERSION.SDK_INT >= 33) s.registerReceiver(rx, f, Context.RECEIVER_EXPORTED);
             else s.registerReceiver(rx, f);
         } catch (Exception ignored) { }
-        if (media != null) {
+        if (!medias.isEmpty()) {
             try {
                 msm.addOnActiveSessionsChangedListener(sessions, new ComponentName(s, MediaListener.class), h);
             } catch (Exception ignored) { }
         }
+        MediaListener.onChange = () -> { h.removeCallbacks(notifRun); h.postDelayed(notifRun, 120); };
     }
 
     private void unregister() {
@@ -656,49 +860,21 @@ final class Panel implements PanelRoot.Host {
         registered = false;
         try { s.unregisterReceiver(rx); } catch (Exception ignored) { }
         try { msm.removeOnActiveSessionsChangedListener(sessions); } catch (Exception ignored) { }
+        MediaListener.onChange = null;
         setController(null);
         h.removeCallbacks(refreshRun);
+        h.removeCallbacks(notifRun);
     }
 
     private void refresh() {
-        if (content == null) return;
+        if (stage == null) return;
         Date now = new Date();
         timeView.setText(DateFormat.getTimeFormat(s).format(now));
         dateView.setText(new SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(now));
         int pct = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY);
         battView.setText((bm.isCharging() ? "⚡ " : "") + pct + "%");
 
-        if (wifi != null) {
-            boolean on = wifiMgr != null && wifiMgr.isWifiEnabled();
-            boolean wifiNet = hasTransport(NetworkCapabilities.TRANSPORT_WIFI);
-            wifi.setActive(on);
-            wifi.setSub(wifiNet ? "Connected" : on ? "Not Connected" : "Off");
-
-            boolean btOn = btEnabled();
-            bt.setActive(btOn);
-            bt.setSub(btOn ? "On" : "Off");
-
-            boolean airOn = Settings.Global.getInt(s.getContentResolver(), Settings.Global.AIRPLANE_MODE_ON, 0) == 1;
-            air.setActive(airOn);
-            cell.setActive(!airOn && (hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) || dataEnabled()));
-            hotspot.setActive(apEnabled());
-            LocationManager lm = s.getSystemService(LocationManager.class);
-            loc.setActive(lm != null && lm.isLocationEnabled());
-        }
-
-        if (focus != null) {
-            int fil = nm.getCurrentInterruptionFilter();
-            boolean dnd = fil != NotificationManager.INTERRUPTION_FILTER_ALL && fil != NotificationManager.INTERRUPTION_FILTER_UNKNOWN;
-            focus.setActive(dnd);
-            focus.setSub(dnd ? "Do Not Disturb" : "Off");
-            AlarmManager alm = s.getSystemService(AlarmManager.class);
-            AlarmManager.AlarmClockInfo next = alm == null ? null : alm.getNextAlarmClock();
-            alarm.setActive(next != null);
-            if (next != null) {
-                String pat = DateFormat.is24HourFormat(s) ? "EEE HH:mm" : "EEE h:mm a";
-                alarm.setSub(new SimpleDateFormat(pat, Locale.getDefault()).format(new Date(next.getTriggerTime())));
-            } else alarm.setSub("No alarms");
-        }
+        for (Map.Entry<String, Multi> e : tiles.entrySet()) state(e.getKey(), e.getValue());
 
         if (bright != null) {
             ContentResolver cr = s.getContentResolver();
@@ -707,18 +883,16 @@ final class Panel implements PanelRoot.Host {
             boolean auto = Settings.System.getInt(cr, Settings.System.SCREEN_BRIGHTNESS_MODE, 0) == 1;
             bright.badge = auto ? "AUTO" : "";
             bright.invalidate();
+        }
+        if (vol != null) {
             int max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
             int idx = am.getStreamVolume(AudioManager.STREAM_MUSIC);
             lastVolIdx = idx;
             vol.setValue(max > 0 ? idx / (float) max : 0);
             vol.setIcon(idx == 0 ? R.drawable.ic_mute : R.drawable.ic_volume);
-            bindMedia();
         }
-        refreshSmall();
-    }
-
-    private void refreshSmall() {
-        for (int i = 0; i < small.size(); i++) stateSmall(smallIds.get(i), small.get(i));
+        bindMedia();
+        renderNotifs();
     }
 
     private boolean hasTransport(int t) {
@@ -760,97 +934,155 @@ final class Panel implements PanelRoot.Host {
         }
     }
 
-    // ------------------------------------------------------------------ small tiles
+    private boolean airplaneOn() {
+        return Settings.Global.getInt(s.getContentResolver(), Settings.Global.AIRPLANE_MODE_ON, 0) == 1;
+    }
 
-    private void stateSmall(String id, TileView t) {
+    // ================================================================== tile state
+
+    private void state(String id, Multi m) {
         ContentResolver cr = s.getContentResolver();
         if (AppTiles.isApp(id)) {
             AppTiles.T at = AppTiles.find(appTiles, id);
-            if (at != null && at.vpn) t.setActive(hasTransport(NetworkCapabilities.TRANSPORT_VPN));
+            if (at != null && at.vpn) m.setActive(hasTransport(NetworkCapabilities.TRANSPORT_VPN));
             return;
         }
         switch (id) {
+            case "wifi": {
+                boolean on = wifiMgr != null && wifiMgr.isWifiEnabled();
+                m.setActive(on);
+                m.setSub(hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ? "Connected" : on ? "Not Connected" : "Off");
+                break;
+            }
+            case "bt": {
+                boolean on = btEnabled();
+                m.setActive(on);
+                m.setSub(on ? "On" : "Off");
+                break;
+            }
+            case "cell":
+                m.setActive(!airplaneOn() && (hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) || dataEnabled()));
+                break;
+            case "air": m.setActive(airplaneOn()); break;
+            case "hotspot": m.setActive(apEnabled()); break;
+            case "location": {
+                LocationManager lm = s.getSystemService(LocationManager.class);
+                m.setActive(lm != null && lm.isLocationEnabled());
+                break;
+            }
+            case "focus": {
+                int fil = nm.getCurrentInterruptionFilter();
+                boolean dnd = fil != NotificationManager.INTERRUPTION_FILTER_ALL && fil != NotificationManager.INTERRUPTION_FILTER_UNKNOWN;
+                m.setActive(dnd);
+                m.setSub(dnd ? "Do Not Disturb" : "Off");
+                break;
+            }
+            case "alarm": {
+                AlarmManager alm = s.getSystemService(AlarmManager.class);
+                AlarmManager.AlarmClockInfo next = alm == null ? null : alm.getNextAlarmClock();
+                m.setActive(next != null);
+                if (next != null) {
+                    String pat = DateFormat.is24HourFormat(s) ? "EEE HH:mm" : "EEE h:mm a";
+                    m.setSub(new SimpleDateFormat(pat, Locale.getDefault()).format(new Date(next.getTriggerTime())));
+                } else m.setSub("No alarms");
+                break;
+            }
             case "nfc": {
                 try {
                     android.nfc.NfcAdapter na = android.nfc.NfcAdapter.getDefaultAdapter(s);
-                    t.setActive(na != null && na.isEnabled());
-                } catch (Exception e) { t.setActive(false); }
+                    m.setActive(na != null && na.isEnabled());
+                } catch (Exception e) { m.setActive(false); }
                 break;
             }
             case "datasaver":
-                t.setActive(conn.getRestrictBackgroundStatus() == ConnectivityManager.RESTRICT_BACKGROUND_STATUS_ENABLED);
+                m.setActive(conn.getRestrictBackgroundStatus() == ConnectivityManager.RESTRICT_BACKGROUND_STATUS_ENABLED);
                 break;
-            case "flash": t.setActive(torchOn); break;
+            case "flash": m.setActive(torchOn); break;
             case "dark": {
                 UiModeManager um = s.getSystemService(UiModeManager.class);
-                t.setActive(um != null && um.getNightMode() == UiModeManager.MODE_NIGHT_YES);
+                m.setActive(um != null && um.getNightMode() == UiModeManager.MODE_NIGHT_YES);
                 break;
             }
             case "rotate":
-                t.setActive(Settings.System.getInt(cr, Settings.System.ACCELEROMETER_ROTATION, 1) == 0);
+                m.setActive(Settings.System.getInt(cr, Settings.System.ACCELEROMETER_ROTATION, 1) == 0);
                 break;
-            case "battery": t.setActive(pm.isPowerSaveMode()); break;
+            case "battery": m.setActive(pm.isPowerSaveMode()); break;
             case "ringer": {
-                int m = am.getRingerMode();
-                t.setActive(m != AudioManager.RINGER_MODE_NORMAL);
-                t.setIcon(m == AudioManager.RINGER_MODE_VIBRATE ? R.drawable.ic_vibrate
-                        : m == AudioManager.RINGER_MODE_SILENT ? R.drawable.ic_bell_off : R.drawable.ic_bell);
+                int r = am.getRingerMode();
+                m.setActive(r != AudioManager.RINGER_MODE_NORMAL);
+                m.setIcon(r == AudioManager.RINGER_MODE_VIBRATE ? R.drawable.ic_vibrate
+                        : r == AudioManager.RINGER_MODE_SILENT ? R.drawable.ic_bell_off : R.drawable.ic_bell);
                 break;
             }
-            case "awake": t.setActive(sp.getBoolean(Prefs.AWAKE, false)); break;
-            default: t.setActive(false);
+            case "awake": m.setActive(sp.getBoolean(Prefs.AWAKE, false)); break;
+            default: m.setActive(false);
         }
     }
 
-    private void clickSmall(String id, TileView t) {
+    // ================================================================== tap / hold
+
+    private void click(String id) {
+        Multi m = multi(id);
+        if (AppTiles.isApp(id)) { clickAppTile(id, m); return; }
         ContentResolver cr = s.getContentResolver();
-        if (AppTiles.isApp(id)) { clickAppTile(id, t); return; }
         switch (id) {
-            case "nfc": {
-                Runnable fb = () -> launchAny(new Intent(Settings.ACTION_NFC_SETTINGS), new Intent(Settings.ACTION_WIRELESS_SETTINGS));
-                boolean on = t.isOn();
-                qsToggle(t, !on, new String[]{"NFC"}, null, "NFC on", "NFC off", fb);
+            case "wifi": toggleWifi(m); return;
+            case "bt": toggleBt(m); return;
+            case "cell":
+                qsToggle(m, !m.isOn(), new String[]{"Internet", "Mobile data"}, new String[]{"Mobile data"},
+                        "Mobile data on", "Mobile data off",
+                        () -> launchPanel("android.settings.panel.action.INTERNET_CONNECTIVITY", Settings.ACTION_DATA_ROAMING_SETTINGS));
                 return;
-            }
-            case "datasaver": {
-                Runnable fb = () -> launchAny(new Intent("android.settings.DATA_SAVER_SETTINGS"), new Intent(Settings.ACTION_DATA_USAGE_SETTINGS));
-                boolean on = t.isOn();
-                qsToggle(t, !on, new String[]{"Data Saver", "Data saver"}, null, "Data saver on", "Data saver off", fb);
+            case "air":
+                qsToggle(m, !m.isOn(), new String[]{"Airplane mode", "Aeroplane mode", "Flight mode"}, null,
+                        "Airplane mode on", "Airplane mode off", () -> launch(new Intent(Settings.ACTION_AIRPLANE_MODE_SETTINGS)));
                 return;
-            }
+            case "hotspot":
+                qsToggle(m, !m.isOn(), new String[]{"Hotspot", "Mobile hotspot", "Wi-Fi hotspot"}, null,
+                        "Hotspot on", "Hotspot off", this::openTether);
+                return;
+            case "location": toggleLocation(m); return;
+            case "focus": toggleDnd(m); return;
+            case "alarm": launch(new Intent(AlarmClock.ACTION_SHOW_ALARMS)); return;
+            case "nfc":
+                qsToggle(m, !m.isOn(), new String[]{"NFC"}, null, "NFC on", "NFC off",
+                        () -> launchAny(new Intent(Settings.ACTION_NFC_SETTINGS), new Intent(Settings.ACTION_WIRELESS_SETTINGS)));
+                return;
+            case "datasaver":
+                qsToggle(m, !m.isOn(), new String[]{"Data Saver", "Data saver"}, null, "Data saver on", "Data saver off",
+                        () -> launchAny(new Intent("android.settings.DATA_SAVER_SETTINGS"), new Intent(Settings.ACTION_DATA_USAGE_SETTINGS)));
+                return;
             case "flash":
                 if (camId == null) { showHint("No flashlight found"); return; }
                 try { cam.setTorchMode(camId, !torchOn); } catch (Exception e) { showHint("Flashlight is busy"); }
                 return;
-            case "dark": toggleDark(); return;
+            case "dark": toggleDark(m); return;
             case "calc":
                 launchAny(Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_CALCULATOR),
                         pkgLaunch("com.google.android.calculator"));
                 return;
-            case "rotate":
+            case "rotate": {
                 if (!canWrite()) return;
                 boolean locked = Settings.System.getInt(cr, Settings.System.ACCELEROMETER_ROTATION, 1) == 0;
                 Settings.System.putInt(cr, Settings.System.ACCELEROMETER_ROTATION, locked ? 1 : 0);
-                t.setActive(!locked);
+                m.setActive(!locked);
                 showHint(locked ? "Auto-rotate on" : "Rotation locked");
                 return;
+            }
             case "qr":
                 launchAny(new Intent().setComponent(new ComponentName("com.google.android.gms",
                                 "com.google.android.gms.mlkit.barcode.v2.ScannerActivity")),
                         pkgLaunch("com.google.ar.lens"),
                         new Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA));
                 return;
-            case "battery": {
-                Runnable fb = () -> launch(new Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS));
-                boolean on = pm.isPowerSaveMode();
-                qsToggle(t, !on, new String[]{"Battery Saver", "Battery saver", "Power saving", "Battery saver mode"}, null,
-                        "Battery saver on", "Battery saver off", fb);
+            case "battery":
+                qsToggle(m, !pm.isPowerSaveMode(), new String[]{"Battery Saver", "Battery saver", "Power saving"}, null,
+                        "Battery saver on", "Battery saver off", () -> launch(new Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS)));
                 return;
-            }
             case "shot": global(AccessibilityService.GLOBAL_ACTION_TAKE_SCREENSHOT, 450); return;
             case "camera": launch(new Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)); return;
-            case "ringer": cycleRinger(t); return;
-            case "awake": toggleAwake(t); return;
+            case "ringer": cycleRinger(m); return;
+            case "awake": toggleAwake(m); return;
             case "timer": launchAny(new Intent(AlarmClock.ACTION_SHOW_TIMERS), new Intent(AlarmClock.ACTION_SET_TIMER)); return;
             case "music":
                 launchAny(pkgLaunch("com.shazam.android"),
@@ -865,9 +1097,17 @@ final class Panel implements PanelRoot.Host {
         }
     }
 
-    private void longSmall(String id) {
+    private void longClick(String id) {
         if (AppTiles.isApp(id)) { longAppTile(id); return; }
         switch (id) {
+            case "wifi": launch(new Intent(Settings.ACTION_WIFI_SETTINGS)); return;
+            case "bt": launch(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS)); return;
+            case "cell": launchAny(new Intent(Settings.ACTION_NETWORK_OPERATOR_SETTINGS), new Intent(Settings.ACTION_DATA_ROAMING_SETTINGS)); return;
+            case "air": launch(new Intent(Settings.ACTION_AIRPLANE_MODE_SETTINGS)); return;
+            case "hotspot": openTether(); return;
+            case "location": launch(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)); return;
+            case "focus": launchAny(new Intent("android.settings.ZEN_MODE_SETTINGS"), new Intent(Settings.ACTION_SOUND_SETTINGS)); return;
+            case "alarm": launch(new Intent(AlarmClock.ACTION_SET_ALARM)); return;
             case "nfc": launchAny(new Intent(Settings.ACTION_NFC_SETTINGS), new Intent(Settings.ACTION_WIRELESS_SETTINGS)); return;
             case "datasaver": launchAny(new Intent("android.settings.DATA_SAVER_SETTINGS"), new Intent(Settings.ACTION_DATA_USAGE_SETTINGS)); return;
             case "dark": launchAny(new Intent("android.settings.DARK_THEME_SETTINGS"), new Intent(Settings.ACTION_DISPLAY_SETTINGS)); return;
@@ -876,21 +1116,19 @@ final class Panel implements PanelRoot.Host {
             case "battery": launch(new Intent(Intent.ACTION_POWER_USAGE_SUMMARY)); return;
             case "ringer": launch(new Intent(Settings.ACTION_SOUND_SETTINGS)); return;
             case "camera": launch(new Intent(MediaStore.INTENT_ACTION_VIDEO_CAMERA)); return;
-            default: showHint(Tiles.label(id));
+            default: showHint(label(id));
         }
     }
 
-    private QsClicker qs;
-
-    /** Flips a tile now, presses the matching system Quick Settings tile, and falls back to settings if that fails. */
-    private void qsToggle(TileView t, boolean newState, String[] tile, String[] dialogRow,
+    /** Flips the tile now, presses the matching system Quick Settings tile, falls back to settings. */
+    private void qsToggle(Multi m, boolean newState, String[] tile, String[] dialogRow,
                           String hintOn, String hintOff, Runnable fallback) {
         if (qs == null) qs = new QsClicker(s);
-        t.setActive(newState);
+        m.setActive(newState);
         showHint(newState ? hintOn : hintOff);
         qs.toggle(tile, dialogRow, ok -> {
             if (!ok) {
-                t.setActive(!newState);
+                m.setActive(!newState);
                 showHint("Couldn't find it in your Quick Settings");
                 h.postDelayed(fallback, 700);
             }
@@ -900,87 +1138,65 @@ final class Panel implements PanelRoot.Host {
     }
 
     @SuppressWarnings("deprecation")
-    private void toggleWifi() {
+    private void toggleWifi(Multi m) {
         boolean on = wifiMgr != null && wifiMgr.isWifiEnabled();
         boolean ok = false;
         try { ok = wifiMgr.setWifiEnabled(!on); } catch (Exception ignored) { }
         if (ok) {
-            wifi.setActive(!on);
-            wifi.setSub(!on ? "Turning on…" : "Off");
+            m.setActive(!on);
+            m.setSub(!on ? "Turning on…" : "Off");
             showHint(!on ? "Wi-Fi on" : "Wi-Fi off");
         } else {
-            qsToggle(wifi, !on, new String[]{"Internet", "Wi-Fi", "Wi‑Fi"}, new String[]{"Wi-Fi", "Wi‑Fi"},
+            qsToggle(m, !on, new String[]{"Internet", "Wi-Fi", "Wi‑Fi"}, new String[]{"Wi-Fi", "Wi‑Fi"},
                     "Wi-Fi on", "Wi-Fi off",
                     () -> launchPanel("android.settings.panel.action.WIFI", Settings.ACTION_WIFI_SETTINGS));
         }
     }
 
     @SuppressWarnings({"deprecation", "MissingPermission"})
-    private void toggleBt() {
-        boolean on = btEnabled();
-        boolean ok = false;
+    private void toggleBt(Multi m) {
+        boolean on = btEnabled(), ok = false;
         try {
             BluetoothManager bmgr = s.getSystemService(BluetoothManager.class);
             BluetoothAdapter a = bmgr == null ? null : bmgr.getAdapter();
             if (a != null) ok = on ? a.disable() : a.enable();
         } catch (Exception ignored) { }
         if (ok) {
-            bt.setActive(!on);
-            bt.setSub(!on ? "Turning on…" : "Off");
+            m.setActive(!on);
+            m.setSub(!on ? "Turning on…" : "Off");
             showHint(!on ? "Bluetooth on" : "Bluetooth off");
         } else {
-            qsToggle(bt, !on, new String[]{"Bluetooth"}, null, "Bluetooth on", "Bluetooth off",
+            qsToggle(m, !on, new String[]{"Bluetooth"}, null, "Bluetooth on", "Bluetooth off",
                     () -> launch(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS)));
         }
     }
 
-    private void toggleData() {
-        boolean on = cell.isOn();
-        Runnable fb = () -> launchPanel("android.settings.panel.action.INTERNET_CONNECTIVITY", Settings.ACTION_DATA_ROAMING_SETTINGS);
-        qsToggle(cell, !on, new String[]{"Internet", "Mobile data"}, new String[]{"Mobile data"},
-                "Mobile data on", "Mobile data off", fb);
-    }
-
-    private void toggleAirplane() {
-        boolean on = air.isOn();
-        Runnable fb = () -> launch(new Intent(Settings.ACTION_AIRPLANE_MODE_SETTINGS));
-        qsToggle(air, !on, new String[]{"Airplane mode", "Aeroplane mode", "Flight mode"}, null,
-                "Airplane mode on", "Airplane mode off", fb);
-    }
-
-    private void toggleHotspot() {
-        boolean on = hotspot.isOn();
-        qsToggle(hotspot, !on, new String[]{"Hotspot", "Mobile hotspot", "Wi-Fi hotspot"}, null,
-                "Hotspot on", "Hotspot off", this::openTether);
-    }
-
     @SuppressWarnings("deprecation")
-    private void toggleLocation() {
+    private void toggleLocation(Multi m) {
         LocationManager lm = s.getSystemService(LocationManager.class);
         boolean on = lm != null && lm.isLocationEnabled();
         try {
             Settings.Secure.putInt(s.getContentResolver(), Settings.Secure.LOCATION_MODE,
                     on ? Settings.Secure.LOCATION_MODE_OFF : Settings.Secure.LOCATION_MODE_HIGH_ACCURACY);
-            loc.setActive(!on);
+            m.setActive(!on);
             showHint(!on ? "Location on" : "Location off");
             h.postDelayed(refreshRun, 900);
         } catch (Exception e) {
-            Runnable fb = () -> launch(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));
-            qsToggle(loc, !on, new String[]{"Location"}, null, "Location on", "Location off", fb);
+            qsToggle(m, !on, new String[]{"Location"}, null, "Location on", "Location off",
+                    () -> launch(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)));
         }
     }
 
-    // ---- tiles from other apps (e.g. Intra)
-
-    private void clickAppTile(String id, TileView t) {
+    private void clickAppTile(String id, Multi m) {
         AppTiles.T at = AppTiles.find(appTiles, id);
         if (at == null) return;
-        boolean on = t.isOn();
+        boolean on = m.isOn();
         if (qs == null) qs = new QsClicker(s);
-        if (at.vpn) t.setActive(!on); else { t.setActive(true); h.postDelayed(() -> t.setActive(false), 450); }
+        if (at.vpn) m.setActive(!on);
+        else { m.setActive(true); h.postDelayed(() -> m.setActive(false), 450); }
         qs.toggle(new String[]{at.label}, null, ok -> {
             if (!ok) {
-                if (at.vpn) t.setActive(on);
+                if (at.vpn) m.setActive(on);
                 showHint("Add " + at.label + " to your phone's Quick Settings once");
                 h.postDelayed(() -> launchAny(pkgLaunch(at.pkg)), 1200);
             }
@@ -997,31 +1213,30 @@ final class Panel implements PanelRoot.Host {
                 new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + at.pkg)));
     }
 
-    private void toggleDark() {
+    private void toggleDark(Multi m) {
         UiModeManager um = s.getSystemService(UiModeManager.class);
         int target = um.getNightMode() == UiModeManager.MODE_NIGHT_YES ? UiModeManager.MODE_NIGHT_NO : UiModeManager.MODE_NIGHT_YES;
         try {
             um.setNightMode(target);
-            if (um.getNightMode() == target) { refreshSmall(); return; }
+            if (um.getNightMode() == target) { m.setActive(target == UiModeManager.MODE_NIGHT_YES); return; }
         } catch (Exception ignored) { }
-        TileView t = small.get(smallIds.indexOf("dark"));
         boolean dark = target == UiModeManager.MODE_NIGHT_YES;
-        qsToggle(t, dark, new String[]{"Dark theme", "Dark mode", "Dark Theme"}, null, "Dark theme on", "Dark theme off",
+        qsToggle(m, dark, new String[]{"Dark theme", "Dark mode", "Dark Theme"}, null, "Dark theme on", "Dark theme off",
                 () -> launchAny(new Intent("android.settings.DARK_THEME_SETTINGS"), new Intent(Settings.ACTION_DISPLAY_SETTINGS)));
     }
 
-    private void cycleRinger(TileView t) {
-        int m = am.getRingerMode();
-        int next = m == AudioManager.RINGER_MODE_NORMAL ? AudioManager.RINGER_MODE_VIBRATE
-                : m == AudioManager.RINGER_MODE_VIBRATE ? AudioManager.RINGER_MODE_SILENT : AudioManager.RINGER_MODE_NORMAL;
+    private void cycleRinger(Multi m) {
+        int r = am.getRingerMode();
+        int next = r == AudioManager.RINGER_MODE_NORMAL ? AudioManager.RINGER_MODE_VIBRATE
+                : r == AudioManager.RINGER_MODE_VIBRATE ? AudioManager.RINGER_MODE_SILENT : AudioManager.RINGER_MODE_NORMAL;
         if (next == AudioManager.RINGER_MODE_SILENT && !nm.isNotificationPolicyAccessGranted())
             next = AudioManager.RINGER_MODE_NORMAL;
         try { am.setRingerMode(next); } catch (Exception e) { next = am.getRingerMode(); }
         showHint(next == AudioManager.RINGER_MODE_VIBRATE ? "Vibrate" : next == AudioManager.RINGER_MODE_SILENT ? "Silent" : "Sound on");
-        stateSmall("ringer", t);
+        state("ringer", m);
     }
 
-    private void toggleAwake(TileView t) {
+    private void toggleAwake(Multi m) {
         if (!canWrite()) return;
         ContentResolver cr = s.getContentResolver();
         boolean on = sp.getBoolean(Prefs.AWAKE, false);
@@ -1035,10 +1250,10 @@ final class Panel implements PanelRoot.Host {
             sp.edit().putBoolean(Prefs.AWAKE, false).apply();
             showHint("Normal screen timeout");
         }
-        t.setActive(!on);
+        m.setActive(!on);
     }
 
-    private void toggleDnd() {
+    private void toggleDnd(Multi m) {
         if (!nm.isNotificationPolicyAccessGranted()) {
             showHint("Allow Do Not Disturb access first");
             h.postDelayed(() -> launch(new Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)), 700);
@@ -1046,11 +1261,11 @@ final class Panel implements PanelRoot.Host {
         }
         boolean on = nm.getCurrentInterruptionFilter() != NotificationManager.INTERRUPTION_FILTER_ALL;
         nm.setInterruptionFilter(on ? NotificationManager.INTERRUPTION_FILTER_ALL : NotificationManager.INTERRUPTION_FILTER_PRIORITY);
-        focus.setActive(!on);
-        focus.setSub(!on ? "Do Not Disturb" : "Off");
+        m.setActive(!on);
+        m.setSub(!on ? "Do Not Disturb" : "Off");
     }
 
-    // ------------------------------------------------------------------ sliders
+    // ================================================================== sliders
 
     private boolean canWrite() {
         if (Settings.System.canWrite(s)) return true;
@@ -1075,8 +1290,7 @@ final class Panel implements PanelRoot.Host {
             Settings.System.putInt(cr, Settings.System.SCREEN_BRIGHTNESS_MODE, 0);
             bright.badge = "";
         }
-        int val = Math.max(1, Math.round(v * v * 255));
-        Settings.System.putInt(cr, Settings.System.SCREEN_BRIGHTNESS, val);
+        Settings.System.putInt(cr, Settings.System.SCREEN_BRIGHTNESS, Math.max(1, Math.round(v * v * 255)));
     }
 
     private void toggleAutoBrightness() {
@@ -1100,10 +1314,10 @@ final class Panel implements PanelRoot.Host {
         }
     }
 
-    // ------------------------------------------------------------------ media
+    // ================================================================== media
 
     private void bindMedia() {
-        if (media == null) return;
+        if (medias.isEmpty()) return;
         try {
             List<MediaController> list = msm.getActiveSessions(new ComponentName(s, MediaListener.class));
             MediaController pick = null;
@@ -1116,7 +1330,8 @@ final class Panel implements PanelRoot.Host {
             updateMedia();
         } catch (SecurityException e) {
             setController(null);
-            media.set("Media access is off", "Tap to allow", null, false, false);
+            for (MediaView mv : medias) mv.set("Media access is off", "Tap to allow", null, false, false);
+            if (compactMedia != null) compactMedia.setVisibility(View.GONE);
         }
     }
 
@@ -1128,23 +1343,29 @@ final class Panel implements PanelRoot.Host {
     }
 
     private void updateMedia() {
-        if (media == null) return;
-        if (mc == null) { media.set(null, null, null, false, false); return; }
-        MediaMetadata md = mc.getMetadata();
+        if (medias.isEmpty()) return;
         String title = null, artist = null;
         Bitmap art = null;
-        if (md != null) {
-            title = md.getString(MediaMetadata.METADATA_KEY_TITLE);
-            if (title == null) title = md.getString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE);
-            artist = md.getString(MediaMetadata.METADATA_KEY_ARTIST);
-            if (artist == null) artist = md.getString(MediaMetadata.METADATA_KEY_ALBUM_ARTIST);
-            art = md.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART);
-            if (art == null) art = md.getBitmap(MediaMetadata.METADATA_KEY_ART);
-            if (art == null) art = md.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON);
+        boolean playing = false;
+        if (mc != null) {
+            MediaMetadata md = mc.getMetadata();
+            if (md != null) {
+                title = md.getString(MediaMetadata.METADATA_KEY_TITLE);
+                if (title == null) title = md.getString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE);
+                artist = md.getString(MediaMetadata.METADATA_KEY_ARTIST);
+                if (artist == null) artist = md.getString(MediaMetadata.METADATA_KEY_ALBUM_ARTIST);
+                art = md.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART);
+                if (art == null) art = md.getBitmap(MediaMetadata.METADATA_KEY_ART);
+                if (art == null) art = md.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON);
+            }
+            PlaybackState st = mc.getPlaybackState();
+            playing = st != null && (st.getState() == PlaybackState.STATE_PLAYING || st.getState() == PlaybackState.STATE_BUFFERING);
         }
-        PlaybackState st = mc.getPlaybackState();
-        boolean playing = st != null && (st.getState() == PlaybackState.STATE_PLAYING || st.getState() == PlaybackState.STATE_BUFFERING);
-        media.set(title, artist, art, playing, true);
+        for (MediaView mv : medias) mv.set(title, artist, art, playing, mc != null);
+        if (compactMedia != null) {
+            // The music row only appears on the compact page while something is loaded.
+            compactMedia.setVisibility(mc != null && title != null ? View.VISIBLE : View.GONE);
+        }
     }
 
     private void mediaAct(int which) {
@@ -1174,10 +1395,9 @@ final class Panel implements PanelRoot.Host {
             case MediaView.OUTPUT: {
                 String pkg = mc.getPackageName();
                 try {
-                    Intent i = new Intent("com.android.settings.panel.action.MEDIA_OUTPUT")
+                    s.startActivity(new Intent("com.android.settings.panel.action.MEDIA_OUTPUT")
                             .putExtra("com.android.settings.panel.extra.PACKAGE_NAME", pkg)
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    s.startActivity(i);
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
                     close();
                 } catch (Exception e) {
                     try {
@@ -1190,27 +1410,138 @@ final class Panel implements PanelRoot.Host {
                 }
                 break;
             }
-            case MediaView.OPEN: {
-                PendingIntent pi = mc.getSessionActivity();
-                boolean ok = false;
-                if (pi != null) {
-                    try {
-                        if (Build.VERSION.SDK_INT >= 34) {
-                            ActivityOptions o = ActivityOptions.makeBasic();
-                            o.setPendingIntentBackgroundActivityStartMode(ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED);
-                            pi.send(s, 0, null, null, null, null, o.toBundle());
-                        } else pi.send();
-                        ok = true;
-                        close();
-                    } catch (Exception ignored) { }
-                }
-                if (!ok) launchAny(pkgLaunch(mc.getPackageName()));
+            case MediaView.OPEN:
+                if (!sendPending(mc.getSessionActivity())) launchAny(pkgLaunch(mc.getPackageName()));
                 break;
-            }
         }
     }
 
-    // ------------------------------------------------------------------ helpers
+    private boolean sendPending(PendingIntent pi) {
+        if (pi == null) return false;
+        try {
+            if (Build.VERSION.SDK_INT >= 34) {
+                ActivityOptions o = ActivityOptions.makeBasic();
+                o.setPendingIntentBackgroundActivityStartMode(ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED);
+                pi.send(s, 0, null, null, null, null, o.toBundle());
+            } else pi.send();
+            close();
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    // ================================================================== notifications
+
+    private List<StatusBarNotification> notifs() {
+        ArrayList<StatusBarNotification> out = new ArrayList<>();
+        MediaListener l = MediaListener.instance;
+        if (l == null) return out;
+        StatusBarNotification[] all;
+        try { all = l.getActiveNotifications(); } catch (Exception e) { return out; }
+        if (all == null) return out;
+        HashMap<String, Integer> groupSize = new HashMap<>();
+        for (StatusBarNotification sbn : all) {
+            String gk = sbn.getGroupKey();
+            groupSize.put(gk, groupSize.getOrDefault(gk, 0) + 1);
+        }
+        for (StatusBarNotification sbn : all) {
+            Notification n = sbn.getNotification();
+            Bundle ex = n.extras;
+            if (ex != null && ex.containsKey(Notification.EXTRA_MEDIA_SESSION)) continue; // shown as the music row
+            boolean summary = (n.flags & Notification.FLAG_GROUP_SUMMARY) != 0;
+            if (summary && groupSize.getOrDefault(sbn.getGroupKey(), 0) > 1) continue;
+            CharSequence t = ex == null ? null : ex.getCharSequence(Notification.EXTRA_TITLE);
+            CharSequence x = ex == null ? null : ex.getCharSequence(Notification.EXTRA_TEXT);
+            if ((t == null || t.length() == 0) && (x == null || x.length() == 0)) continue;
+            out.add(sbn);
+        }
+        out.sort((a, b) -> Long.compare(b.getPostTime(), a.getPostTime()));
+        return out.size() > 40 ? out.subList(0, 40) : out;
+    }
+
+    private int countNotifs() { return notifs().size(); }
+
+    private String appName(String pkg) {
+        String n = appNames.get(pkg);
+        if (n != null) return n;
+        try {
+            PackageManager pmg = s.getPackageManager();
+            n = pmg.getApplicationLabel(pmg.getApplicationInfo(pkg, 0)).toString();
+        } catch (Exception e) {
+            n = pkg;
+        }
+        appNames.put(pkg, n);
+        return n;
+    }
+
+    private void renderNotifs() {
+        if (notifList == null) return;
+        List<StatusBarNotification> list = notifs();
+        StringBuilder sig = new StringBuilder();
+        for (StatusBarNotification sbn : list) sig.append(sbn.getKey()).append(sbn.getPostTime()).append('|');
+        String ns = sig.toString();
+        if (ns.equals(notifSig) && notifList.getChildCount() > 0) return;
+        notifSig = ns;
+        notifList.removeAllViews();
+        if (list.isEmpty()) {
+            notifList.addView(emptyView);
+            return;
+        }
+        long now = System.currentTimeMillis();
+        for (StatusBarNotification sbn : list) {
+            Notification n = sbn.getNotification();
+            Bundle ex = n.extras;
+            CharSequence t = ex.getCharSequence(Notification.EXTRA_TITLE);
+            CharSequence big = ex.getCharSequence(Notification.EXTRA_BIG_TEXT);
+            CharSequence x = big != null ? big : ex.getCharSequence(Notification.EXTRA_TEXT);
+            Drawable icon = null;
+            try { if (n.getSmallIcon() != null) icon = n.getSmallIcon().loadDrawable(s); } catch (Exception ignored) { }
+            long age = now - sbn.getPostTime();
+            String when = age < 60_000 ? "now" : DateUtils.getRelativeTimeSpanString(sbn.getPostTime(), now,
+                    DateUtils.MINUTE_IN_MILLIS, DateUtils.FORMAT_ABBREV_RELATIVE).toString();
+            NotifCard card = new NotifCard(s, u, icon, true, appName(sbn.getPackageName()), when,
+                    t == null ? "" : t.toString(), x == null ? "" : x.toString(), sbn.isClearable(),
+                    new NotifCard.Actions() {
+                        @Override public void open() { openNotif(sbn); }
+                        @Override public void dismiss() { dismissNotif(sbn); }
+                    });
+            LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(-1, -2);
+            clp.bottomMargin = Math.round(g * 0.6f);
+            notifList.addView(card, clp);
+        }
+    }
+
+    private void openNotif(StatusBarNotification sbn) {
+        Notification n = sbn.getNotification();
+        boolean ok = sendPending(n.contentIntent);
+        if (!ok) launchAny(pkgLaunch(sbn.getPackageName()));
+        if ((n.flags & Notification.FLAG_AUTO_CANCEL) != 0) dismissNotif(sbn);
+    }
+
+    private void dismissNotif(StatusBarNotification sbn) {
+        MediaListener l = MediaListener.instance;
+        if (l != null && sbn.isClearable()) {
+            try { l.cancelNotification(sbn.getKey()); } catch (Exception ignored) { }
+        }
+        h.postDelayed(notifRun, 150);
+    }
+
+    private void clearAll() {
+        MediaListener l = MediaListener.instance;
+        if (l == null) return;
+        TileView.buzz(root, HapticFeedbackConstants.CLOCK_TICK);
+        for (int i = 0; i < notifList.getChildCount(); i++) {
+            View v = notifList.getChildAt(i);
+            v.animate().translationX(W).alpha(0f).setStartDelay(i * 35L).setDuration(220).start();
+        }
+        h.postDelayed(() -> {
+            try { l.cancelAllNotifications(); } catch (Exception ignored) { }
+            h.postDelayed(notifRun, 150);
+        }, 260 + Math.min(10, notifList.getChildCount()) * 35L);
+    }
+
+    // ================================================================== helpers
 
     private Intent pkgLaunch(String pkg) {
         return pkg == null ? null : s.getPackageManager().getLaunchIntentForPackage(pkg);

@@ -3,12 +3,17 @@ package com.fable.control;
 /** Catalogue of the small round tiles users can add, remove and reorder. */
 final class Tiles {
     static final String[] ALL = {
+            "cell", "air", "hotspot", "location",
             "flash", "dark", "calc", "rotate", "qr", "battery", "shot", "camera",
             "ringer", "awake", "nfc", "datasaver", "timer", "music", "lock", "power", "split", "notif", "settings"
     };
 
     static String label(String id) {
         switch (id) {
+            case "cell": return "Mobile data";
+            case "air": return "Airplane mode";
+            case "hotspot": return "Hotspot";
+            case "location": return "Location";
             case "flash": return "Flashlight";
             case "dark": return "Dark theme";
             case "calc": return "Calculator";
@@ -34,6 +39,10 @@ final class Tiles {
 
     static int icon(String id) {
         switch (id) {
+            case "cell": return R.drawable.ic_cell;
+            case "air": return R.drawable.ic_airplane;
+            case "hotspot": return R.drawable.ic_hotspot;
+            case "location": return R.drawable.ic_location;
             case "flash": return R.drawable.ic_flash;
             case "dark": return R.drawable.ic_contrast;
             case "calc": return R.drawable.ic_calc;

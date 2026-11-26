@@ -8,7 +8,7 @@ final class Prefs {
     static final String TILES = "tiles", ACCENT = "accent", DIM = "dim", BLUR = "blur", SCALE = "scale",
             HAPTICS = "haptics", TRIGGER = "trigger", ZONE = "zone", HANDLE = "handle",
             SEC_CONN = "sec_conn", SEC_MEDIA = "sec_media", SEC_FOCUS = "sec_focus",
-            AWAKE = "awake_on", GLASS = "glass", PREV_TIMEOUT = "prev_timeout", ROUND = "roundness";
+            AWAKE = "awake_on", GLASS = "glass", NOTIF_PAGE = "notif_page", PREV_TIMEOUT = "prev_timeout", ROUND = "roundness";
 
     static final String DEFAULT_TILES = "flash,dark,calc,rotate,qr,battery,shot,camera";
 
@@ -17,6 +17,12 @@ final class Prefs {
     static final String[] ACCENT_NAMES = {"Blue", "Green", "Orange", "Pink", "Purple", "Red", "Teal", "White"};
 
     static final int TRIG_TOP_RIGHT = 0, TRIG_TOP_LEFT = 1, TRIG_TOP_ALL = 2, TRIG_RIGHT_EDGE = 3;
+
+    static final String[] DEFAULT_SLOTS = {"cell", "air", "hotspot", "location"};
+
+    static String slot(SharedPreferences p, int i) {
+        return p.getString("slot" + i, DEFAULT_SLOTS[i]);
+    }
 
     static SharedPreferences get(Context c) {
         return c.getSharedPreferences(NAME, Context.MODE_PRIVATE);

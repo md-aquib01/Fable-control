@@ -7,7 +7,10 @@ import android.view.VelocityTracker;
 import android.view.ViewConfiguration;
 import android.widget.FrameLayout;
 
-/** Full-screen root of the panel: swipe up anywhere to close, tap empty space to close, back closes. */
+/**
+ * Full-screen root of the panel. Swipe up to close, tap empty space to close, back closes,
+ * and swipe sideways to switch between the notifications page and the full control centre.
+ */
 final class PanelRoot extends FrameLayout {
     interface Host {
         void onDragStart();
@@ -15,12 +18,17 @@ final class PanelRoot extends FrameLayout {
         void onDragEnd(float velocityY);
         void onTapOutside();
         void onBack();
+        boolean canPage(float rawX, float rawY);
+        boolean blocksClose(float rawX, float rawY);
+        void onPageDragStart();
+        void onPageDrag(float dx);
+        void onPageDragEnd(float velocityX);
     }
 
     private final Host host;
     private final int slop;
     private float x0, y0;
-    private boolean dragging, tapping;
+    private boolean dragging, hdrag, tapping, allowH, allowUp;
     private VelocityTracker vt;
 
     PanelRoot(Context c, Host h) {
@@ -42,64 +50,74 @@ final class PanelRoot extends FrameLayout {
         if (vt != null) { vt.recycle(); vt = null; }
     }
 
-    private boolean wantsDrag(MotionEvent e) {
-        float up = y0 - e.getRawY(), side = Math.abs(e.getRawX() - x0);
-        return up > slop * 1.5f && up > side;
+    private void down(MotionEvent e) {
+        recycle();
+        track(e);
+        x0 = e.getRawX(); y0 = e.getRawY();
+        dragging = hdrag = false;
+        allowH = host.canPage(x0, y0);
+        allowUp = !host.blocksClose(x0, y0);
+    }
+
+    /** Returns true once a gesture (close or page) has been claimed. */
+    private boolean decide(MotionEvent e) {
+        float dx = e.getRawX() - x0, up = y0 - e.getRawY();
+        if (allowH && Math.abs(dx) > slop * 1.2f && Math.abs(dx) > Math.abs(up) * 1.3f) {
+            hdrag = true;
+            host.onPageDragStart();
+            return true;
+        }
+        if (allowUp && up > slop * 1.5f && up > Math.abs(dx)) {
+            dragging = true;
+            host.onDragStart();
+            return true;
+        }
+        return false;
     }
 
     @Override
     public boolean onInterceptTouchEvent(MotionEvent e) {
         switch (e.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
-                recycle();
-                track(e);
-                x0 = e.getRawX(); y0 = e.getRawY();
-                dragging = false;
+                down(e);
                 break;
             case MotionEvent.ACTION_MOVE:
                 track(e);
-                if (!dragging && wantsDrag(e)) {
-                    dragging = true;
-                    host.onDragStart();
-                    return true;
-                }
+                if (!dragging && !hdrag && decide(e)) return true;
                 break;
         }
-        return dragging;
+        return dragging || hdrag;
     }
 
     @Override
     public boolean onTouchEvent(MotionEvent e) {
         switch (e.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
-                recycle();
-                track(e);
-                x0 = e.getRawX(); y0 = e.getRawY();
+                down(e);
                 tapping = true;
-                dragging = false;
                 return true;
             case MotionEvent.ACTION_MOVE:
                 track(e);
-                if (!dragging) {
+                if (!dragging && !hdrag) {
                     if (Math.hypot(e.getRawX() - x0, e.getRawY() - y0) > slop) tapping = false;
-                    if (wantsDrag(e)) { dragging = true; host.onDragStart(); }
+                    decide(e);
                 }
                 if (dragging) host.onDrag(y0 - e.getRawY());
+                else if (hdrag) host.onPageDrag(e.getRawX() - x0);
                 return true;
             case MotionEvent.ACTION_UP:
                 track(e);
-                if (dragging) {
-                    vt.computeCurrentVelocity(1000);
-                    host.onDragEnd(vt.getYVelocity());
-                } else if (tapping) {
-                    host.onTapOutside();
-                }
-                dragging = false;
+                vt.computeCurrentVelocity(1000);
+                if (dragging) host.onDragEnd(vt.getYVelocity());
+                else if (hdrag) host.onPageDragEnd(vt.getXVelocity());
+                else if (tapping) host.onTapOutside();
+                dragging = hdrag = false;
                 recycle();
                 return true;
             case MotionEvent.ACTION_CANCEL:
                 if (dragging) host.onDragEnd(0);
-                dragging = false;
+                else if (hdrag) host.onPageDragEnd(0);
+                dragging = hdrag = false;
                 recycle();
                 return true;
         }
