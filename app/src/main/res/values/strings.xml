@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Fable Control</string>
+    <string name="a11y_desc">Opens the Fable Control panel when you swipe down from the corner you choose. It does not read what is on your screen; it only draws the panel and uses system actions like screenshot and lock screen.</string>
+</resources>
