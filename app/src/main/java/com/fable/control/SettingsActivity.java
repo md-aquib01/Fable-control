@@ -263,7 +263,7 @@ public class SettingsActivity extends Activity {
 
     private void widgetCard() {
         LinearLayout c = card("Home-screen widget");
-        TextView intro = text("Works without Accessibility, so payment and banking apps don't complain. Wi-Fi, Bluetooth, flashlight, Focus, sound, rotation, keep awake, volume and brightness switch right on the widget; the rest open their settings.", 13, SUB, false);
+        TextView intro = text("Works without Accessibility, so payment and banking apps don't complain. Wi-Fi, Bluetooth, flashlight, Focus, sound, rotation, keep awake, volume, brightness and music work right on the widget; mobile data, airplane, hotspot and other system switches open their settings.", 13, SUB, false);
         intro.setPadding(dp(16), dp(12), dp(16), dp(6));
         c.addView(intro);
         row(c, "Add widget to home screen", "Or long-press your home screen → Widgets → Fable Control", null, () -> {
@@ -275,56 +275,9 @@ public class SettingsActivity extends Activity {
             } catch (Exception ignored) { }
             if (!ok) android.widget.Toast.makeText(this, "Long-press your home screen → Widgets → Fable Control", android.widget.Toast.LENGTH_LONG).show();
         });
-        toggle(c, "Show labels", "Small names under each button", Prefs.W_LABELS, true);
-        toggle(c, "Music row", "Artwork and controls while something is playing (needs Notification access)", Prefs.W_MEDIA, true);
-        toggle(c, "Connected device row", "Your buds' photo and battery while they're connected", Prefs.W_DEVICE, true);
-
-        TextView hdr = text("WIDGET BUTTONS", 12, SUB, true);
-        hdr.setLetterSpacing(0.06f);
-        hdr.setPadding(dp(16), dp(16), dp(16), dp(4));
-        c.addView(hdr);
-
-        if (appTiles == null) appTiles = AppTiles.load(this);
-        ArrayList<String> on = new ArrayList<>(Arrays.asList(ControlWidget.items(sp)));
-        on.removeIf(id -> id.isEmpty() || (AppTiles.isApp(id) && AppTiles.find(appTiles, id) == null));
-        ArrayList<String> order = new ArrayList<>(on);
-        for (String id : ControlWidget.ALL) if (!order.contains(id)) order.add(id);
-        for (AppTiles.T t : appTiles) if (!order.contains(t.id)) order.add(t.id);
-        for (String id : order) {
-            AppTiles.T at = AppTiles.isApp(id) ? AppTiles.find(appTiles, id) : null;
-            boolean enabled = on.contains(id);
-            LinearLayout r = new LinearLayout(this);
-            r.setGravity(Gravity.CENTER_VERTICAL);
-            r.setPadding(dp(14), dp(6), dp(10), dp(6));
-            ImageView ic = new ImageView(this);
-            if (at != null) { ic.setImageDrawable(at.icon); if (at.tint) ic.setColorFilter(enabled ? 0xFF000000 : 0xFFFFFFFF); }
-            else { ic.setImageResource(ControlWidget.icon(id)); ic.setColorFilter(enabled ? 0xFF000000 : 0xFFFFFFFF); }
-            GradientDrawable g = new GradientDrawable();
-            g.setShape(GradientDrawable.OVAL);
-            g.setColor(enabled ? 0xFFFFFFFF : 0xFF3A3A3C);
-            ic.setBackground(g);
-            ic.setPadding(dp(8), dp(8), dp(8), dp(8));
-            r.addView(ic, new LinearLayout.LayoutParams(dp(34), dp(34)));
-            String name = at != null ? at.label + " (opens app)" : ControlWidget.label(id);
-            TextView t = text(name, 15, enabled ? 0xFFFFFFFF : SUB, false);
-            t.setPadding(dp(12), 0, 0, 0);
-            r.addView(t, new LinearLayout.LayoutParams(0, -2, 1f));
-            if (enabled) {
-                int pos = on.indexOf(id);
-                r.addView(arrow("↑", pos > 0, () -> wMove(on, pos, -1)));
-                r.addView(arrow("↓", pos < on.size() - 1, () -> wMove(on, pos, 1)));
-            }
-            Switch s = makeSwitch(enabled);
-            s.setOnCheckedChangeListener((v, ch) -> {
-                ArrayList<String> n = new ArrayList<>(on);
-                if (ch) n.add(id); else n.remove(id);
-                wSave(n);
-            });
-            r.addView(s);
-            c.addView(r);
-        }
-        View pad = new View(this);
-        c.addView(pad, new LinearLayout.LayoutParams(1, dp(8)));
+        TextView same = text("The widget is your control centre: same layout, same buttons, same order. Change them below under Layout, Sections, Device card and Buttons. Tap a slider where you want the level. Resize the widget to fit everything.", 13, SUB, false);
+        same.setPadding(dp(16), dp(8), dp(16), dp(14));
+        c.addView(same);
     }
 
     private void wMove(ArrayList<String> on, int pos, int d) {

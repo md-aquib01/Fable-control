@@ -125,6 +125,52 @@ public class ControlWidget extends AppWidgetProvider {
     // ------------------------------------------------------------------ drawing
 
     private static RemoteViews render(Context c, Bundle opts) {
+        if (Build.VERSION.SDK_INT >= 31) {
+            try { return renderCanvas(c, opts); } catch (Throwable ignored) { }
+        }
+        return renderGrid(c, opts);
+    }
+
+    /** Android 12+: draw the control centre itself, then lay invisible tap targets over each part. */
+    private static RemoteViews renderCanvas(Context c, Bundle opts) {
+        float d = c.getResources().getDisplayMetrics().density;
+        int wDp = opts == null ? 0 : opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0);
+        int hDp = opts == null ? 0 : opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0);
+        if (wDp <= 0) wDp = 320;
+        if (hDp <= 0) hDp = 440;
+        int w = Math.round(wDp * d), h = Math.round(hDp * d);
+
+        WidgetRenderer.Result r = new WidgetRenderer(c).render(w, h);
+        SharedPreferences sp = Prefs.get(c);
+        RemoteViews root = new RemoteViews(c.getPackageName(), R.layout.widget_canvas);
+        root.setImageViewBitmap(R.id.w_canvas, r.bitmap);
+        int px = android.util.TypedValue.COMPLEX_UNIT_PX;
+        root.setViewLayoutWidth(R.id.w_canvas, w, px);
+        root.setViewLayoutHeight(R.id.w_canvas, h, px);
+        root.setViewLayoutWidth(R.id.w_hits, w, px);
+        root.setViewLayoutHeight(R.id.w_hits, h, px);
+        root.removeAllViews(R.id.w_hits);
+        List<AppTiles.T> apps = null;
+        for (WidgetRenderer.Hit hit : r.hits) {
+            RemoteViews hv = new RemoteViews(c.getPackageName(), R.layout.widget_hit);
+            hv.setViewLayoutWidth(R.id.w_hit, hit.r.width(), px);
+            hv.setViewLayoutHeight(R.id.w_hit, hit.r.height(), px);
+            hv.setViewLayoutMargin(R.id.w_hit, RemoteViews.MARGIN_LEFT, hit.r.left, px);
+            hv.setViewLayoutMargin(R.id.w_hit, RemoteViews.MARGIN_TOP, hit.r.top, px);
+            AppTiles.T at = null;
+            if (AppTiles.isApp(hit.id)) {
+                if (apps == null) apps = AppTiles.load(c);
+                at = AppTiles.find(apps, hit.id);
+            }
+            PendingIntent pi = clickIntent(c, sp, hit.id, at);
+            if (pi != null) hv.setOnClickPendingIntent(R.id.w_hit, pi);
+            root.addView(R.id.w_hits, hv);
+        }
+        return root;
+    }
+
+    /** Older Android: simple grid of the chosen buttons. */
+    private static RemoteViews renderGrid(Context c, Bundle opts) {
         SharedPreferences sp = Prefs.get(c);
         RemoteViews root = new RemoteViews(c.getPackageName(), R.layout.widget_root);
         root.removeAllViews(R.id.w_root);
@@ -391,7 +437,27 @@ public class ControlWidget extends AppWidgetProvider {
         boolean canWrite = Settings.System.canWrite(c);
         boolean dnd = c.getSystemService(NotificationManager.class).isNotificationPolicyAccessGranted();
         Intent writeSettings = new Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:" + c.getPackageName()));
+        if (id.startsWith("bri_set_")) return canWrite ? broadcast(c, id) : activity(c, "perm_write", writeSettings);
+        if (id.startsWith("vol_set_") || id.startsWith("m_prev") || id.startsWith("m_play") || id.startsWith("m_next"))
+            return broadcast(c, id);
         switch (id) {
+            case "m_open": {
+                MediaController mc = controller(c);
+                if (mc != null && mc.getSessionActivity() != null) return mc.getSessionActivity();
+                Intent li = mc == null ? null : launch(c, mc.getPackageName());
+                return li != null ? activity(c, id, li) : activity(c, "perm_listener", new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));
+            }
+            case "m_out": {
+                MediaController mc = controller(c);
+                Intent i = new Intent("com.android.settings.panel.action.MEDIA_OUTPUT")
+                        .putExtra("com.android.settings.panel.extra.PACKAGE_NAME", mc == null ? c.getPackageName() : mc.getPackageName());
+                return activity(c, id, i);
+            }
+            case "alarm": return activity(c, id, new Intent(AlarmClock.ACTION_SHOW_ALARMS));
+            case "dev": return activity(c, id, new Intent(Settings.ACTION_BLUETOOTH_SETTINGS));
+            case "shot": case "lock": case "power": case "split": case "notif": case "off":
+                // these need Accessibility (the swipe-down panel), so open Fable Control instead
+                return activity(c, "app", new Intent(c, SettingsActivity.class));
             case "wifi": case "bt": case "flash": case "ringer": case "vol_down": case "vol_up":
                 return broadcast(c, id);
             case "rotate": case "awake": case "bri_down": case "bri_up":
@@ -444,6 +510,18 @@ public class ControlWidget extends AppWidgetProvider {
         SharedPreferences sp = Prefs.get(c);
         ContentResolver cr = c.getContentResolver();
         AudioManager am = c.getSystemService(AudioManager.class);
+        if (id.startsWith("vol_set_")) {
+            int pct = Integer.parseInt(id.substring(8));
+            int max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+            am.setStreamVolume(AudioManager.STREAM_MUSIC, Math.round(max * pct / 100f), 0);
+            return;
+        }
+        if (id.startsWith("bri_set_")) {
+            float p = Math.max(0.03f, Integer.parseInt(id.substring(8)) / 100f);
+            Settings.System.putInt(cr, Settings.System.SCREEN_BRIGHTNESS_MODE, 0);
+            Settings.System.putInt(cr, Settings.System.SCREEN_BRIGHTNESS, Math.max(1, Math.round(p * p * 255)));
+            return;
+        }
         switch (id) {
             case "wifi": {
                 WifiManager w = c.getApplicationContext().getSystemService(WifiManager.class);
