@@ -24,8 +24,15 @@ import android.widget.SeekBar;
 import android.widget.Switch;
 import android.widget.TextView;
 
+import android.graphics.drawable.AdaptiveIconDrawable;
+import android.graphics.drawable.Drawable;
+import android.content.pm.PackageManager;
+
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
+
+import rikka.shizuku.Shizuku;
 
 /** Setup checklist plus every customisation option, built in code to keep the app tiny. */
 public class SettingsActivity extends Activity {
@@ -36,6 +43,29 @@ public class SettingsActivity extends Activity {
     private LinearLayout list;
     private ScrollView scroll;
     private int accent;
+    private List<AppTiles.T> appTiles;
+    private boolean granting;
+
+    private final Shizuku.OnRequestPermissionResultListener permL = (code, result) -> {
+        if (code == Shell.REQ && result == PackageManager.PERMISSION_GRANTED) grantAll();
+        else render();
+    };
+    private final Shizuku.OnBinderReceivedListener binderL = () -> runOnUiThread(this::render);
+
+    private void grantAll() {
+        granting = true;
+        render();
+        Shell.run(Shell.grantAllScript(this), ok -> { granting = false; render(); });
+    }
+
+    @Override
+    protected void onDestroy() {
+        try {
+            Shizuku.removeRequestPermissionResultListener(permL);
+            Shizuku.removeBinderReceivedListener(binderL);
+        } catch (Throwable ignored) { }
+        super.onDestroy();
+    }
 
     private int dp(float v) { return Math.round(v * getResources().getDisplayMetrics().density); }
 
@@ -53,11 +83,16 @@ public class SettingsActivity extends Activity {
         list.setPadding(dp(16), dp(20), dp(16), dp(40));
         scroll.addView(list, new FrameLayout.LayoutParams(-1, -2));
         setContentView(scroll);
+        try {
+            Shizuku.addRequestPermissionResultListener(permL);
+            Shizuku.addBinderReceivedListenerSticky(binderL);
+        } catch (Throwable ignored) { }
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        appTiles = null;
         render();
     }
 
@@ -91,6 +126,37 @@ public class SettingsActivity extends Activity {
         boolean write = Settings.System.canWrite(this);
         boolean media = isListenerOn();
         boolean dnd = getSystemService(NotificationManager.class).isNotificationPolicyAccessGranted();
+
+        // Shizuku: unlocks one-tap switching and can grant everything below automatically.
+        boolean shInstalled = Shell.installed(this), shRunning = Shell.running(), shReady = Shell.ready();
+        String shSub, shState;
+        Runnable shFix;
+        if (shReady) {
+            shState = granting ? "Working…" : "On";
+            shSub = (a11y && write && media && dnd) ? "Every button switches with one tap"
+                    : "Tap to grant the permissions below automatically";
+            shFix = this::grantAll;
+        } else if (shRunning) {
+            shState = "Allow ›";
+            shSub = "Tap, then choose Allow in the Shizuku pop-up";
+            shFix = Shell::request;
+        } else if (shInstalled) {
+            shState = "Start ›";
+            shSub = "Open Shizuku and tap Start (redo after each restart)";
+            shFix = () -> {
+                Intent i = getPackageManager().getLaunchIntentForPackage(Shell.SHIZUKU_PKG);
+                if (i != null) start(i);
+            };
+        } else {
+            shState = "Get ›";
+            shSub = "Free app that lets mobile data, airplane, location and more switch with one tap";
+            shFix = () -> {
+                try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=" + Shell.SHIZUKU_PKG))); }
+                catch (Exception e) { start(new Intent(Intent.ACTION_VIEW, Uri.parse("https://shizuku.rikka.app/download/"))); }
+            };
+        }
+        TextView shT = text(shState, 14, shReady && !granting ? 0xFF30D158 : accent, true);
+        row(c, "Shizuku (one-tap everything)", shSub, shT, shFix);
 
         permRow(c, "Turn on Fable Control", "Required. Settings → Accessibility → Fable Control", a11y,
                 () -> start(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
@@ -181,24 +247,41 @@ public class SettingsActivity extends Activity {
 
     private void tilesCard() {
         LinearLayout c = card("Buttons");
-        TextView note = text("Switch buttons on or off and use the arrows to change their order. Long-press any button in the panel for more options.", 13, SUB, false);
+        TextView note = text("Switch buttons on or off and use the arrows to change their order. \"From your apps\" lists Quick Settings tiles from apps you've installed, like Intra. Long-press any button in the panel for its settings.", 13, SUB, false);
         note.setPadding(dp(16), dp(10), dp(16), dp(6));
         c.addView(note);
 
         ArrayList<String> on = new ArrayList<>(Arrays.asList(Prefs.tiles(sp)));
         on.removeIf(String::isEmpty);
+        if (appTiles == null) appTiles = AppTiles.load(this);
+        on.removeIf(id -> AppTiles.isApp(id) && AppTiles.find(appTiles, id) == null);
         ArrayList<String> order = new ArrayList<>(on);
         for (String id : Tiles.ALL) if (!order.contains(id)) order.add(id);
+        int builtInEnd = order.size();
+        for (AppTiles.T t : appTiles) if (!order.contains(t.id)) order.add(t.id);
 
-        for (String id : order) {
+        for (int k = 0; k < order.size(); k++) {
+            String id = order.get(k);
+            if (k == builtInEnd && !appTiles.isEmpty()) {
+                TextView hdr = text("FROM YOUR APPS", 12, SUB, true);
+                hdr.setLetterSpacing(0.06f);
+                hdr.setPadding(dp(16), dp(16), dp(16), dp(4));
+                c.addView(hdr);
+            }
+            AppTiles.T at = AppTiles.isApp(id) ? AppTiles.find(appTiles, id) : null;
             boolean enabled = on.contains(id);
             LinearLayout r = new LinearLayout(this);
             r.setGravity(Gravity.CENTER_VERTICAL);
             r.setPadding(dp(14), dp(8), dp(10), dp(8));
 
             ImageView ic = new ImageView(this);
-            ic.setImageResource(Tiles.icon(id));
-            ic.setColorFilter(enabled ? 0xFF000000 : 0xFFFFFFFF);
+            if (at != null) {
+                ic.setImageDrawable(at.icon);
+                if (at.tint) ic.setColorFilter(enabled ? 0xFF000000 : 0xFFFFFFFF);
+            } else {
+                ic.setImageResource(Tiles.icon(id));
+                ic.setColorFilter(enabled ? 0xFF000000 : 0xFFFFFFFF);
+            }
             GradientDrawable g = new GradientDrawable();
             g.setShape(GradientDrawable.OVAL);
             g.setColor(enabled ? 0xFFFFFFFF : 0xFF3A3A3C);
@@ -206,7 +289,7 @@ public class SettingsActivity extends Activity {
             ic.setPadding(dp(8), dp(8), dp(8), dp(8));
             r.addView(ic, new LinearLayout.LayoutParams(dp(38), dp(38)));
 
-            TextView t = text(Tiles.label(id), 16, enabled ? 0xFFFFFFFF : SUB, false);
+            TextView t = text(at != null ? at.label : Tiles.label(id), 16, enabled ? 0xFFFFFFFF : SUB, false);
             t.setPadding(dp(14), 0, 0, 0);
             r.addView(t, new LinearLayout.LayoutParams(0, -2, 1f));
 
@@ -236,8 +319,10 @@ public class SettingsActivity extends Activity {
                 "Swipe up anywhere, tap empty space, or press back to close.",
                 "Long-press brightness to switch auto-brightness. Long-press volume for all volume controls.",
                 "Long-press Wi-Fi, Bluetooth, Focus or Alarm to jump to their full settings.",
-                "Tap Wi-Fi or Bluetooth to switch them, hold for their settings. Android doesn't let any app switch mobile data, airplane mode or hotspot, so those open their settings.",
-                "Location can switch with one tap after a one-time command from a PC (see the repo README); otherwise it opens location settings.",
+                "Tap any button to switch it, hold it for its settings.",
+                "Mobile data, airplane mode, location, battery saver, NFC, data saver, dark theme and app tiles need Shizuku running to switch. Without it, they open their settings.",
+                "Hotspot always opens its settings: Android has no switch for it outside the system itself.",
+                "The first time you tap an app's tile, it's also added to your normal Quick Settings — that's how Android lets it be pressed.",
                 "The panel only uses battery while it's open. The swipe strip is a tiny invisible view."
         };
         for (String t : tips) {

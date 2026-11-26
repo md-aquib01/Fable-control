@@ -18,11 +18,5 @@ An iOS-style control center for stock Android (built for Moto phones). Tiny (no 
 
 Built automatically by GitHub Actions on every push.
 
-## One-tap location (optional)
-Android only lets apps switch location if you grant one extra permission from a PC once:
-
-```
-adb shell pm grant com.fable.control android.permission.WRITE_SECURE_SETTINGS
-```
-
-Without it, tapping Location opens location settings.
+## One-tap everything (Shizuku)
+Install the free **Shizuku** app, start it (Wireless debugging, no PC needed), then tap the Shizuku row in Fable Control's Setup and choose Allow. That makes mobile data, airplane mode, location, battery saver, NFC, data saver, dark theme and other apps' tiles (e.g. Intra) switch with one tap, and grants all of Fable Control's other permissions automatically. Restart Shizuku after each phone reboot.

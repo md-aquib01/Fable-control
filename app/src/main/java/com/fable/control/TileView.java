@@ -64,7 +64,18 @@ final class TileView extends View {
     void setIcon(int res) {
         if (res == iconRes) return;
         iconRes = res;
+        noTint = false;
         icon = getContext().getDrawable(res).mutate();
+        lastTint = 0;
+        invalidate();
+    }
+
+    private boolean noTint;
+
+    void setIconDrawable(Drawable d, boolean tintable) {
+        iconRes = -1;
+        icon = d == null ? null : d.mutate();
+        noTint = !tintable;
         lastTint = 0;
         invalidate();
     }
@@ -85,7 +96,7 @@ final class TileView extends View {
     String label() { return title; }
 
     private void tint(int c) {
-        if (icon != null && c != lastTint) { icon.setTint(c); lastTint = c; }
+        if (icon != null && !noTint && c != lastTint) { icon.setTint(c); lastTint = c; }
     }
 
     @Override

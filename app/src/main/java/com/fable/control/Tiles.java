@@ -4,7 +4,7 @@ package com.fable.control;
 final class Tiles {
     static final String[] ALL = {
             "flash", "dark", "calc", "rotate", "qr", "battery", "shot", "camera",
-            "ringer", "awake", "timer", "music", "lock", "power", "split", "notif", "settings"
+            "ringer", "awake", "nfc", "datasaver", "timer", "music", "lock", "power", "split", "notif", "settings"
     };
 
     static String label(String id) {
@@ -18,6 +18,8 @@ final class Tiles {
             case "shot": return "Screenshot";
             case "camera": return "Camera";
             case "ringer": return "Sound mode";
+            case "nfc": return "NFC";
+            case "datasaver": return "Data saver";
             case "awake": return "Keep awake";
             case "timer": return "Timer";
             case "music": return "Identify song";
@@ -41,6 +43,8 @@ final class Tiles {
             case "shot": return R.drawable.ic_screenshot;
             case "camera": return R.drawable.ic_camera;
             case "ringer": return R.drawable.ic_bell;
+            case "nfc": return R.drawable.ic_nfc;
+            case "datasaver": return R.drawable.ic_datasaver;
             case "awake": return R.drawable.ic_coffee;
             case "timer": return R.drawable.ic_timer;
             case "music": return R.drawable.ic_music;

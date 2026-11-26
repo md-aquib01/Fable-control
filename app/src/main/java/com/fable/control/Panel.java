@@ -90,6 +90,7 @@ final class Panel implements PanelRoot.Host {
     private final ArrayList<View> rowViews = new ArrayList<>();
     private final ArrayList<TileView> small = new ArrayList<>();
     private final ArrayList<String> smallIds = new ArrayList<>();
+    private List<AppTiles.T> appTiles = new ArrayList<>();
     private WindowManager.LayoutParams lp;
 
     // state
@@ -183,6 +184,9 @@ final class Panel implements PanelRoot.Host {
         maxBlur = Math.round(sp.getInt(Prefs.BLUR, 60) / 100f * dp(40));
         dimAlpha = sp.getInt(Prefs.DIM, 45) / 100f;
 
+        appTiles = new ArrayList<>();
+        for (String id : Prefs.tiles(sp)) if (AppTiles.isApp(id)) { appTiles = AppTiles.load(s); break; }
+
         Rect b = screen();
         int W = b.width(), H = b.height();
         int sbH = sysDimen("status_bar_height", 24);
@@ -274,14 +278,14 @@ final class Panel implements PanelRoot.Host {
 
                 cell = round(R.drawable.ic_cell, 0xFF30D158, 0xFFFFFFFF);
                 cell.setTitle("Mobile data");
-                cell.onClick = () -> launchPanel("android.settings.panel.action.INTERNET_CONNECTIVITY", Settings.ACTION_DATA_ROAMING_SETTINGS);
+                cell.onClick = this::toggleData;
                 cell.onLongClick = () -> launchAny(new Intent(Settings.ACTION_NETWORK_OPERATOR_SETTINGS), new Intent(Settings.ACTION_DATA_ROAMING_SETTINGS));
                 add(cell, 2 * (u + g), y, u, u, row);
 
                 air = round(R.drawable.ic_airplane, 0xFFFF9F0A, 0xFFFFFFFF);
                 air.setTitle("Airplane mode");
-                air.onClick = () -> launch(new Intent(Settings.ACTION_AIRPLANE_MODE_SETTINGS));
-                air.onLongClick = air.onClick;
+                air.onClick = this::toggleAirplane;
+                air.onLongClick = () -> launch(new Intent(Settings.ACTION_AIRPLANE_MODE_SETTINGS));
                 add(air, 3 * (u + g), y, u, u, row);
 
                 bt = wide(R.drawable.ic_bluetooth, "Bluetooth", accent);
@@ -291,8 +295,8 @@ final class Panel implements PanelRoot.Host {
 
                 hotspot = round(R.drawable.ic_hotspot, 0xFF30D158, 0xFFFFFFFF);
                 hotspot.setTitle("Hotspot");
-                hotspot.onClick = this::openTether;
-                hotspot.onLongClick = hotspot.onClick;
+                hotspot.onClick = this::toggleHotspot;
+                hotspot.onLongClick = this::openTether;
                 add(hotspot, 2 * (u + g), y + u + g, u, u, row + 1);
 
                 loc = round(R.drawable.ic_location, accent, onColor(accent));
@@ -363,10 +367,15 @@ final class Panel implements PanelRoot.Host {
         int n = 0;
         for (String id : ids) {
             if (id.isEmpty()) continue;
+            AppTiles.T at = AppTiles.isApp(id) ? AppTiles.find(appTiles, id) : null;
+            if (AppTiles.isApp(id) && at == null) continue;
             int col = n % 4, r = n / 4;
             if (make) {
-                TileView t = round(Tiles.icon(id), 0xFFFFFFFF, iconOnColor(id));
-                t.setTitle(Tiles.label(id));
+                TileView t = round(at == null ? Tiles.icon(id) : R.drawable.ic_gear, 0xFFFFFFFF, iconOnColor(id));
+                if (at != null) {
+                    t.setIconDrawable(at.icon, at.tint);
+                    t.setTitle(at.label);
+                } else t.setTitle(Tiles.label(id));
                 final String tid = id;
                 t.onClick = () -> clickSmall(tid, t);
                 t.onLongClick = () -> longSmall(tid);
@@ -755,7 +764,22 @@ final class Panel implements PanelRoot.Host {
 
     private void stateSmall(String id, TileView t) {
         ContentResolver cr = s.getContentResolver();
+        if (AppTiles.isApp(id)) {
+            AppTiles.T at = AppTiles.find(appTiles, id);
+            if (at != null && at.vpn) t.setActive(hasTransport(NetworkCapabilities.TRANSPORT_VPN));
+            return;
+        }
         switch (id) {
+            case "nfc": {
+                try {
+                    android.nfc.NfcAdapter na = android.nfc.NfcAdapter.getDefaultAdapter(s);
+                    t.setActive(na != null && na.isEnabled());
+                } catch (Exception e) { t.setActive(false); }
+                break;
+            }
+            case "datasaver":
+                t.setActive(conn.getRestrictBackgroundStatus() == ConnectivityManager.RESTRICT_BACKGROUND_STATUS_ENABLED);
+                break;
             case "flash": t.setActive(torchOn); break;
             case "dark": {
                 UiModeManager um = s.getSystemService(UiModeManager.class);
@@ -780,7 +804,22 @@ final class Panel implements PanelRoot.Host {
 
     private void clickSmall(String id, TileView t) {
         ContentResolver cr = s.getContentResolver();
+        if (AppTiles.isApp(id)) { clickAppTile(id, t); return; }
         switch (id) {
+            case "nfc": {
+                Runnable fb = () -> launchAny(new Intent(Settings.ACTION_NFC_SETTINGS), new Intent(Settings.ACTION_WIRELESS_SETTINGS));
+                if (!Shell.ready()) { needShizuku(fb); return; }
+                boolean on = t.isOn();
+                shellToggle(t, !on, "svc nfc " + (on ? "disable" : "enable"), "NFC on", "NFC off", fb);
+                return;
+            }
+            case "datasaver": {
+                Runnable fb = () -> launchAny(new Intent("android.settings.DATA_SAVER_SETTINGS"), new Intent(Settings.ACTION_DATA_USAGE_SETTINGS));
+                if (!Shell.ready()) { needShizuku(fb); return; }
+                boolean on = t.isOn();
+                shellToggle(t, !on, "cmd netpolicy set restrict-background " + !on, "Data saver on", "Data saver off", fb);
+                return;
+            }
             case "flash":
                 if (camId == null) { showHint("No flashlight found"); return; }
                 try { cam.setTorchMode(camId, !torchOn); } catch (Exception e) { showHint("Flashlight is busy"); }
@@ -803,7 +842,14 @@ final class Panel implements PanelRoot.Host {
                         pkgLaunch("com.google.ar.lens"),
                         new Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA));
                 return;
-            case "battery": launch(new Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS)); return;
+            case "battery": {
+                Runnable fb = () -> launch(new Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS));
+                if (!Shell.ready()) { needShizuku(fb); return; }
+                boolean on = pm.isPowerSaveMode();
+                shellToggle(t, !on, "cmd power set-mode " + (on ? 0 : 1) + " || settings put global low_power " + (on ? 0 : 1),
+                        "Battery saver on", "Battery saver off", fb);
+                return;
+            }
             case "shot": global(AccessibilityService.GLOBAL_ACTION_TAKE_SCREENSHOT, 450); return;
             case "camera": launch(new Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)); return;
             case "ringer": cycleRinger(t); return;
@@ -823,7 +869,10 @@ final class Panel implements PanelRoot.Host {
     }
 
     private void longSmall(String id) {
+        if (AppTiles.isApp(id)) { longAppTile(id); return; }
         switch (id) {
+            case "nfc": launchAny(new Intent(Settings.ACTION_NFC_SETTINGS), new Intent(Settings.ACTION_WIRELESS_SETTINGS)); return;
+            case "datasaver": launchAny(new Intent("android.settings.DATA_SAVER_SETTINGS"), new Intent(Settings.ACTION_DATA_USAGE_SETTINGS)); return;
             case "dark": launchAny(new Intent("android.settings.DARK_THEME_SETTINGS"), new Intent(Settings.ACTION_DISPLAY_SETTINGS)); return;
             case "rotate":
             case "awake": launch(new Intent(Settings.ACTION_DISPLAY_SETTINGS)); return;
@@ -834,9 +883,35 @@ final class Panel implements PanelRoot.Host {
         }
     }
 
+    /** Optimistically flips a tile, runs a shell command via Shizuku, and falls back if it fails. */
+    private void shellToggle(TileView t, boolean newState, String cmd, String hintOn, String hintOff, Runnable fallback) {
+        if (!Shell.ready()) { fallback.run(); return; }
+        t.setActive(newState);
+        showHint(newState ? hintOn : hintOff);
+        Shell.run(cmd, ok -> {
+            if (!ok) { t.setActive(!newState); fallback.run(); }
+            h.postDelayed(refreshRun, 900);
+            h.postDelayed(refreshRun, 2500);
+        });
+    }
+
+    private void needShizuku(Runnable openSettings) {
+        if (!sp.getBoolean("shizuku_tip", false)) {
+            sp.edit().putBoolean("shizuku_tip", true).apply();
+            showHint("Start Shizuku to switch this with one tap");
+            h.postDelayed(openSettings, 900);
+        } else openSettings.run();
+    }
+
     @SuppressWarnings("deprecation")
     private void toggleWifi() {
         boolean on = wifiMgr != null && wifiMgr.isWifiEnabled();
+        if (Shell.ready()) {
+            wifi.setSub(!on ? "Turning on…" : "Off");
+            shellToggle(wifi, !on, "svc wifi " + (on ? "disable" : "enable"), "Wi-Fi on", "Wi-Fi off",
+                    () -> launchPanel("android.settings.panel.action.WIFI", Settings.ACTION_WIFI_SETTINGS));
+            return;
+        }
         boolean ok = false;
         try { ok = wifiMgr.setWifiEnabled(!on); } catch (Exception ignored) { }
         if (ok) {
@@ -850,7 +925,15 @@ final class Panel implements PanelRoot.Host {
 
     @SuppressWarnings({"deprecation", "MissingPermission"})
     private void toggleBt() {
-        boolean ok = false, on = btEnabled();
+        boolean on = btEnabled();
+        if (Shell.ready()) {
+            bt.setSub(!on ? "Turning on…" : "Off");
+            String v = on ? "disable" : "enable";
+            shellToggle(bt, !on, "cmd bluetooth_manager " + v + " || svc bluetooth " + v, "Bluetooth on", "Bluetooth off",
+                    () -> launch(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS)));
+            return;
+        }
+        boolean ok = false;
         try {
             BluetoothManager bmgr = s.getSystemService(BluetoothManager.class);
             BluetoothAdapter a = bmgr == null ? null : bmgr.getAdapter();
@@ -865,6 +948,26 @@ final class Panel implements PanelRoot.Host {
         }
     }
 
+    private void toggleData() {
+        boolean on = cell.isOn();
+        Runnable fb = () -> launchPanel("android.settings.panel.action.INTERNET_CONNECTIVITY", Settings.ACTION_DATA_ROAMING_SETTINGS);
+        if (!Shell.ready()) { needShizuku(fb); return; }
+        shellToggle(cell, !on, "svc data " + (on ? "disable" : "enable"), "Mobile data on", "Mobile data off", fb);
+    }
+
+    private void toggleAirplane() {
+        boolean on = air.isOn();
+        Runnable fb = () -> launch(new Intent(Settings.ACTION_AIRPLANE_MODE_SETTINGS));
+        if (!Shell.ready()) { needShizuku(fb); return; }
+        shellToggle(air, !on, "cmd connectivity airplane-mode " + (on ? "disable" : "enable"),
+                "Airplane mode on", "Airplane mode off", fb);
+    }
+
+    private void toggleHotspot() {
+        // Android has no hotspot switch even for ADB shell, so go straight to its page.
+        openTether();
+    }
+
     @SuppressWarnings("deprecation")
     private void toggleLocation() {
         LocationManager lm = s.getSystemService(LocationManager.class);
@@ -874,9 +977,44 @@ final class Panel implements PanelRoot.Host {
                     on ? Settings.Secure.LOCATION_MODE_OFF : Settings.Secure.LOCATION_MODE_HIGH_ACCURACY);
             loc.setActive(!on);
             showHint(!on ? "Location on" : "Location off");
+            h.postDelayed(refreshRun, 900);
         } catch (Exception e) {
-            launch(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));
+            Runnable fb = () -> launch(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));
+            if (!Shell.ready()) { needShizuku(fb); return; }
+            shellToggle(loc, !on, "cmd location set-location-enabled " + !on, "Location on", "Location off", fb);
         }
+    }
+
+    // ---- tiles from other apps (e.g. Intra)
+
+    private void clickAppTile(String id, TileView t) {
+        AppTiles.T at = AppTiles.find(appTiles, id);
+        if (at == null) return;
+        String comp = at.comp.flattenToShortString();
+        if (!Shell.ready()) {
+            needShizuku(() -> launchAny(pkgLaunch(at.pkg)));
+            return;
+        }
+        String key = "qs_added:" + comp;
+        String cmd = sp.getBoolean(key, false)
+                ? "cmd statusbar click-tile " + comp
+                : "cmd statusbar add-tile " + comp + "; sleep 0.8; cmd statusbar click-tile " + comp;
+        sp.edit().putBoolean(key, true).apply();
+        if (!at.vpn) { t.setActive(true); h.postDelayed(() -> t.setActive(false), 450); }
+        else t.setActive(!t.isOn());
+        Shell.run(cmd, ok -> {
+            if (!ok) launchAny(pkgLaunch(at.pkg));
+            h.postDelayed(refreshRun, 1200);
+            h.postDelayed(refreshRun, 3000);
+        });
+    }
+
+    private void longAppTile(String id) {
+        AppTiles.T at = AppTiles.find(appTiles, id);
+        if (at == null) return;
+        launchAny(new Intent(android.service.quicksettings.TileService.ACTION_QS_TILE_PREFERENCES).setPackage(at.pkg),
+                pkgLaunch(at.pkg),
+                new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + at.pkg)));
     }
 
     private void toggleDark() {
@@ -886,6 +1024,15 @@ final class Panel implements PanelRoot.Host {
             um.setNightMode(target);
             if (um.getNightMode() == target) { refreshSmall(); return; }
         } catch (Exception ignored) { }
+        if (Shell.ready()) {
+            boolean dark = target == UiModeManager.MODE_NIGHT_YES;
+            Shell.run("cmd uimode night " + (dark ? "yes" : "no"), ok -> {
+                if (!ok) launchAny(new Intent("android.settings.DARK_THEME_SETTINGS"), new Intent(Settings.ACTION_DISPLAY_SETTINGS));
+                else h.postDelayed(refreshRun, 600);
+            });
+            showHint(dark ? "Dark theme on" : "Dark theme off");
+            return;
+        }
         launchAny(new Intent("android.settings.DARK_THEME_SETTINGS"), new Intent(Settings.ACTION_DISPLAY_SETTINGS));
     }
 
