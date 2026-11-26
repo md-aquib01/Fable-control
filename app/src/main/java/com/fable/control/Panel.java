@@ -401,6 +401,7 @@ final class Panel implements PanelRoot.Host {
         if (card) { taken.add(2); taken.add(3); taken.add(6); taken.add(7); }
         if (card && p != null) {
             deviceView = new DeviceView(s);
+            deviceView.unit = u;
             deviceView.listener = new DeviceView.Listener() {
                 @Override public void tap(Devices.Dev d) { deviceTap(d); }
                 @Override public void hold(Devices.Dev d) { launch(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS)); }

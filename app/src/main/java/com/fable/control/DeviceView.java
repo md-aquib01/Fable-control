@@ -28,6 +28,8 @@ final class DeviceView extends View {
     }
 
     Listener listener;
+    /** Height of one normal tile, so text matches the Wi-Fi / Bluetooth tiles exactly. */
+    float unit;
     private List<Devices.Dev> devs = new ArrayList<>();
     private int index;
     private float offset;              // horizontal drag while swiping
@@ -114,11 +116,12 @@ final class DeviceView extends View {
         }
 
         float avail = w * 0.86f;
-        np.setTextSize(w * 0.105f);
+        float uu = unit > 0 ? unit : w * 0.453f;
+        np.setTextSize(uu * 0.2f);      // same as wide tile titles
         np.setAlpha(a);
         CharSequence n = TextUtils.ellipsize(d.name, np, avail, TextUtils.TruncateAt.END);
         c.drawText(n, 0, n.length(), w / 2f, h * 0.735f, np);
-        sp.setTextSize(w * 0.088f);
+        sp.setTextSize(uu * 0.16f);     // same as wide tile subtitles
         sp.setAlpha(Math.round(a * 0.6f));
         String st = d.connected ? (d.battery >= 0 ? "Connected · " + d.battery + "%" : "Connected") : "Saved";
         c.drawText(st, w / 2f, h * 0.835f, sp);
