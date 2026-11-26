@@ -102,6 +102,8 @@ final class Panel implements PanelRoot.Host {
     private ScrollView notifScroll;
     private SliderView bright, vol;
     private MediaView compactMedia;
+    private DeviceView deviceView;
+    private List<Devices.Dev> devs = new ArrayList<>();
     private final ArrayList<MediaView> medias = new ArrayList<>();
     private final ArrayList<View> rowViews = new ArrayList<>();
     private final LinkedHashMap<String, Multi> tiles = new LinkedHashMap<>();
@@ -226,6 +228,8 @@ final class Panel implements PanelRoot.Host {
         rowViews.clear();
         medias.clear();
         bright = vol = null;
+        deviceView = null;
+        devs = sp.getBoolean(Prefs.DEV_CARD, true) ? Devices.forCard(s, sp) : new ArrayList<>();
         compactMedia = null;
         notifList = null;
         notifScroll = null;
@@ -389,14 +393,29 @@ final class Panel implements PanelRoot.Host {
             y += u + g;
             row++;
         }
-        int n = 0;
+        // Round buttons fill a 4-column grid; the device card takes a 2x2 block on the right.
+        boolean card = !devs.isEmpty();
+        java.util.HashSet<Integer> taken = new java.util.HashSet<>();
+        if (card) { taken.add(2); taken.add(3); taken.add(6); taken.add(7); }
+        if (card && p != null) {
+            deviceView = new DeviceView(s);
+            deviceView.listener = new DeviceView.Listener() {
+                @Override public void tap(Devices.Dev d) { deviceTap(d); }
+                @Override public void hold(Devices.Dev d) { launch(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS)); }
+            };
+            deviceView.setDevices(devs);
+            add(p, deviceView, 2 * (u + g), y, 2 * u + g, 2 * u + g, row);
+        }
+        int cell = 0, rows = card ? 2 : 0;
         for (String id : Prefs.tiles(sp)) {
             if (!valid(id)) continue;
-            int col = n % 4, r = n / 4;
+            while (taken.contains(cell)) cell++;
+            int col = cell % 4, r = cell / 4;
             if (p != null) add(p, roundTile(id), col * (u + g), y + r * (u + g), u, u, row + r);
-            n++;
+            rows = Math.max(rows, r + 1);
+            cell++;
         }
-        y += ((n + 3) / 4) * (u + g);
+        y += rows * (u + g);
         return Math.max(y - g - start, 0);
     }
 
@@ -887,6 +906,9 @@ final class Panel implements PanelRoot.Host {
         f.addAction(AlarmManager.ACTION_NEXT_ALARM_CLOCK_CHANGED);
         f.addAction("android.net.wifi.WIFI_AP_STATE_CHANGED");
         f.addAction("android.nfc.action.ADAPTER_STATE_CHANGED");
+        f.addAction(android.bluetooth.BluetoothDevice.ACTION_ACL_CONNECTED);
+        f.addAction(android.bluetooth.BluetoothDevice.ACTION_ACL_DISCONNECTED);
+        f.addAction("android.bluetooth.device.action.BATTERY_LEVEL_CHANGED");
         try {
             if (Build.VERSION.SDK_INT >= 33) s.registerReceiver(rx, f, Context.RECEIVER_EXPORTED);
             else s.registerReceiver(rx, f);
@@ -935,8 +957,34 @@ final class Panel implements PanelRoot.Host {
             vol.setValue(max > 0 ? idx / (float) max : 0);
             vol.setIcon(idx == 0 ? R.drawable.ic_mute : R.drawable.ic_volume);
         }
+        if (deviceView != null) { Devices.refresh(devs); deviceView.changed(); }
         bindMedia();
         renderNotifs();
+    }
+
+    /** Apps can't connect audio devices directly on newer Android, so try, then open the device list. */
+    @SuppressWarnings("MissingPermission")
+    private void deviceTap(Devices.Dev d) {
+        if (!btEnabled()) { showHint("Bluetooth is off"); launch(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS)); return; }
+        if (d.connected) {
+            launchAny(new Intent("com.android.settings.panel.action.MEDIA_OUTPUT")
+                    .putExtra("com.android.settings.panel.extra.PACKAGE_NAME", s.getPackageName()),
+                    new Intent(Settings.ACTION_BLUETOOTH_SETTINGS));
+            return;
+        }
+        boolean ok = false;
+        try {
+            java.lang.reflect.Method m = android.bluetooth.BluetoothDevice.class.getMethod("connect");
+            Object r = m.invoke(d.device);
+            ok = r instanceof Integer ? ((Integer) r) == 0 : (r instanceof Boolean && (Boolean) r);
+        } catch (Throwable ignored) { }
+        if (ok) {
+            showHint("Connecting to " + d.name + "…");
+            h.postDelayed(refreshRun, 2500);
+            h.postDelayed(refreshRun, 5000);
+        } else {
+            launch(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS));
+        }
     }
 
     private boolean hasTransport(int t) {

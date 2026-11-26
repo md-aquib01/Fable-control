@@ -115,6 +115,7 @@ public class SettingsActivity extends Activity {
         triggerCard();
         lookCard();
         sectionsCard();
+        devicesCard();
         tilesCard();
         tipsCard();
         exitCard();
@@ -251,6 +252,100 @@ public class SettingsActivity extends Activity {
         TextView note = text("Blur needs Android 12 or newer and is switched off by the system while Battery Saver is on.", 13, SUB, false);
         note.setPadding(dp(16), dp(4), dp(16), dp(14));
         c.addView(note);
+    }
+
+    private static final int PICK_PHOTO = 41;
+    private String pickingAddr;
+
+    private void devicesCard() {
+        LinearLayout c = card("Device card");
+        toggle(c, "Show device card", "Your headphones with a photo, Connected/Saved and battery. Sits next to the round buttons; swipe it to see other devices.",
+                Prefs.DEV_CARD, true);
+        java.util.List<android.bluetooth.BluetoothDevice> list = Devices.paired(this);
+        if (list.isEmpty()) {
+            TextView t = text("No paired Bluetooth devices found. Pair them in Bluetooth settings first.", 13, SUB, false);
+            t.setPadding(dp(16), dp(8), dp(16), dp(14));
+            c.addView(t);
+            return;
+        }
+        for (android.bluetooth.BluetoothDevice d : list) {
+            String addr = d.getAddress();
+            boolean vis = Devices.visible(sp, d);
+            divider(c);
+            LinearLayout r = new LinearLayout(this);
+            r.setGravity(Gravity.CENTER_VERTICAL);
+            r.setPadding(dp(14), dp(10), dp(10), dp(10));
+
+            ImageView ph = new ImageView(this);
+            android.graphics.Bitmap bmp = Devices.photo(this, addr);
+            if (bmp != null) { ph.setImageBitmap(bmp); ph.setScaleType(ImageView.ScaleType.CENTER_INSIDE); }
+            else { ph.setImageResource(R.drawable.ic_headset); ph.setColorFilter(0xCCFFFFFF); ph.setPadding(dp(9), dp(9), dp(9), dp(9)); }
+            GradientDrawable g = new GradientDrawable();
+            g.setColor(0xFF2C2C2E);
+            g.setCornerRadius(dp(12));
+            ph.setBackground(g);
+            r.addView(ph, new LinearLayout.LayoutParams(dp(46), dp(46)));
+
+            LinearLayout texts = new LinearLayout(this);
+            texts.setOrientation(LinearLayout.VERTICAL);
+            texts.setPadding(dp(12), 0, 0, 0);
+            texts.addView(text(Devices.name(d), 16, vis ? 0xFFFFFFFF : SUB, false));
+            TextView act = text(bmp == null ? "Add photo" : "Change photo", 13, accent, true);
+            act.setPadding(0, dp(4), 0, 0);
+            act.setOnClickListener(v -> {
+                pickingAddr = addr;
+                Intent i = new Intent(Intent.ACTION_GET_CONTENT).setType("image/*").addCategory(Intent.CATEGORY_OPENABLE);
+                try { startActivityForResult(Intent.createChooser(i, "Choose a photo"), PICK_PHOTO); } catch (Exception ignored) { }
+            });
+            LinearLayout acts = new LinearLayout(this);
+            acts.addView(act);
+            if (bmp != null) {
+                TextView rm = text("Remove", 13, SUB, true);
+                rm.setPadding(dp(16), dp(4), 0, 0);
+                rm.setOnClickListener(v -> { Devices.photoFile(this, addr).delete(); render(); });
+                acts.addView(rm);
+            }
+            texts.addView(acts);
+            r.addView(texts, new LinearLayout.LayoutParams(0, -2, 1f));
+
+            Switch s = makeSwitch(vis);
+            s.setOnCheckedChangeListener((v, ch) -> { Devices.setVisible(sp, addr, ch); render(); });
+            r.addView(s);
+            c.addView(r);
+        }
+        TextView note = text("Tip: a photo with a plain or transparent background looks best. Android only shares one battery number with apps, so the card shows the overall level, not left/right/case.", 12, SUB, false);
+        note.setPadding(dp(16), dp(6), dp(16), dp(14));
+        c.addView(note);
+    }
+
+    @Override
+    protected void onActivityResult(int req, int res, Intent data) {
+        super.onActivityResult(req, res, data);
+        if (req != PICK_PHOTO || res != RESULT_OK || data == null || data.getData() == null || pickingAddr == null) return;
+        try {
+            android.content.ContentResolver cr = getContentResolver();
+            android.graphics.BitmapFactory.Options o = new android.graphics.BitmapFactory.Options();
+            o.inJustDecodeBounds = true;
+            try (java.io.InputStream in = cr.openInputStream(data.getData())) { android.graphics.BitmapFactory.decodeStream(in, null, o); }
+            int sample = 1;
+            while (Math.max(o.outWidth, o.outHeight) / (sample * 2) >= 600) sample *= 2;
+            android.graphics.BitmapFactory.Options o2 = new android.graphics.BitmapFactory.Options();
+            o2.inSampleSize = sample;
+            android.graphics.Bitmap b;
+            try (java.io.InputStream in = cr.openInputStream(data.getData())) { b = android.graphics.BitmapFactory.decodeStream(in, null, o2); }
+            if (b == null) return;
+            int max = Math.max(b.getWidth(), b.getHeight());
+            if (max > 600) {
+                float f = 600f / max;
+                b = android.graphics.Bitmap.createScaledBitmap(b, Math.round(b.getWidth() * f), Math.round(b.getHeight() * f), true);
+            }
+            try (java.io.FileOutputStream out = new java.io.FileOutputStream(Devices.photoFile(this, pickingAddr))) {
+                b.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out);
+            }
+            Devices.setVisible(sp, pickingAddr, true);
+            sp.edit().putLong("dev_photo_ts", System.currentTimeMillis()).apply();
+        } catch (Exception ignored) { }
+        render();
     }
 
     private void sectionsCard() {
