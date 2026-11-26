@@ -36,7 +36,36 @@ public class CCService extends AccessibilityService implements SharedPreferences
             if (s.panel != null) s.panel.closeNow();
             try { s.disableSelf(); } catch (Exception ignored) { }
         }
-        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> setServiceEnabled(app, false), 400);
+        android.os.Handler h = new android.os.Handler(android.os.Looper.getMainLooper());
+        // Only hide the service once Android really lists it as off; otherwise payment apps still see it
+        // as "on" and you couldn't find it in Settings to switch it off yourself.
+        h.postDelayed(new Runnable() {
+            int tries = 0;
+            @Override public void run() {
+                if (!enabledInSettings(app)) { setServiceEnabled(app, false); return; }
+                if (++tries < 10) { h.postDelayed(this, 200); return; }
+                // Android didn't switch it off: open its page so you can flip the switch.
+                try {
+                    app.startActivity(new android.content.Intent("android.settings.ACCESSIBILITY_DETAILS_SETTINGS")
+                            .putExtra(android.content.Intent.EXTRA_COMPONENT_NAME,
+                                    new android.content.ComponentName(app, CCService.class).flattenToString())
+                            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK));
+                } catch (Exception e) {
+                    try {
+                        app.startActivity(new android.content.Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK));
+                    } catch (Exception ignored) { }
+                }
+            }
+        }, 300);
+    }
+
+    static boolean enabledInSettings(Context c) {
+        String v = android.provider.Settings.Secure.getString(c.getContentResolver(),
+                android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+        if (v == null) return false;
+        android.content.ComponentName me = new android.content.ComponentName(c, CCService.class);
+        return v.contains(me.flattenToString()) || v.contains(me.flattenToShortString());
     }
 
     static void setServiceEnabled(Context c, boolean on) {
