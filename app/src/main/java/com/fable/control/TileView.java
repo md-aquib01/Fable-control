@@ -18,7 +18,7 @@ import android.view.animation.OvershootInterpolator;
 final class TileView extends View {
     static final int ROUND = 0, WIDE = 1;
     static boolean HAPTICS = true;
-    static int IDLE_BG = 0xA6161618;
+    static int IDLE_BG = 0x24FFFFFF;
     static float ROUNDNESS = 1f;
 
     private static final DecelerateInterpolator DOWN_I = new DecelerateInterpolator(2f);
@@ -97,7 +97,7 @@ final class TileView extends View {
             float rr = r * ROUNDNESS;
             c.drawRoundRect(w / 2f - r, h / 2f - r, w / 2f + r, h / 2f + r, rr, rr, bg);
             if (icon != null) {
-                int s = (int) (r * 0.84f);
+                int s = (int) (r * 0.68f);
                 icon.setBounds((w - s) / 2, (h - s) / 2, (w + s) / 2, (h + s) / 2);
                 tint(active ? onFg : 0xFFFFFFFF);
                 icon.draw(c);
@@ -111,7 +111,7 @@ final class TileView extends View {
         bg.setColor(active ? onBg : 0x26FFFFFF);
         c.drawCircle(cx, cy, cr, bg);
         if (icon != null) {
-            int s = (int) (cr * 1.2f);
+            int s = (int) (cr * 1.0f);
             icon.setBounds((int) (cx - s / 2f), (int) (cy - s / 2f), (int) (cx + s / 2f), (int) (cy + s / 2f));
             tint(active ? onFg : 0xFFFFFFFF);
             icon.draw(c);

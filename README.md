@@ -17,3 +17,12 @@ An iOS-style control center for stock Android (built for Moto phones). Tiny (no 
 - Blur, darkness, size, roundness, accent colour, trigger corner/edge, haptics, sections on/off
 
 Built automatically by GitHub Actions on every push.
+
+## One-tap location (optional)
+Android only lets apps switch location if you grant one extra permission from a PC once:
+
+```
+adb shell pm grant com.fable.control android.permission.WRITE_SECURE_SETTINGS
+```
+
+Without it, tapping Location opens location settings.

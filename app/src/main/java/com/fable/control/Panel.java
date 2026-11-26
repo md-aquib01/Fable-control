@@ -179,6 +179,7 @@ final class Panel implements PanelRoot.Host {
         trigger = sp.getInt(Prefs.TRIGGER, Prefs.TRIG_TOP_RIGHT);
         TileView.HAPTICS = sp.getBoolean(Prefs.HAPTICS, true);
         TileView.ROUNDNESS = sp.getInt(Prefs.ROUND, 100) / 100f;
+        TileView.IDLE_BG = sp.getBoolean(Prefs.GLASS, true) ? 0x24FFFFFF : 0xA6161618;
         maxBlur = Math.round(sp.getInt(Prefs.BLUR, 60) / 100f * dp(40));
         dimAlpha = sp.getInt(Prefs.DIM, 45) / 100f;
 
@@ -212,7 +213,7 @@ final class Panel implements PanelRoot.Host {
         clp.topMargin = (int) top;
         root.addView(content, clp);
         content.setPivotY(0);
-        content.setPivotX(trigger == Prefs.TRIG_TOP_LEFT ? 0 : (trigger == Prefs.TRIG_TOP_ALL ? cw / 2f : cw));
+        content.setPivotX(cw / 2f);
 
         hint = new TextView(s);
         hint.setTextColor(0xFFFFFFFF);
@@ -267,14 +268,14 @@ final class Panel implements PanelRoot.Host {
         if (sp.getBoolean(Prefs.SEC_CONN, true)) {
             if (make) {
                 wifi = wide(R.drawable.ic_wifi, "Wi-Fi", accent);
-                wifi.onClick = () -> launchPanel("android.settings.panel.action.WIFI", Settings.ACTION_WIFI_SETTINGS);
+                wifi.onClick = this::toggleWifi;
                 wifi.onLongClick = () -> launch(new Intent(Settings.ACTION_WIFI_SETTINGS));
                 add(wifi, 0, y, 2 * u + g, u, row);
 
                 cell = round(R.drawable.ic_cell, 0xFF30D158, 0xFFFFFFFF);
                 cell.setTitle("Mobile data");
                 cell.onClick = () -> launchPanel("android.settings.panel.action.INTERNET_CONNECTIVITY", Settings.ACTION_DATA_ROAMING_SETTINGS);
-                cell.onLongClick = () -> launch(new Intent(Settings.ACTION_DATA_ROAMING_SETTINGS));
+                cell.onLongClick = () -> launchAny(new Intent(Settings.ACTION_NETWORK_OPERATOR_SETTINGS), new Intent(Settings.ACTION_DATA_ROAMING_SETTINGS));
                 add(cell, 2 * (u + g), y, u, u, row);
 
                 air = round(R.drawable.ic_airplane, 0xFFFF9F0A, 0xFFFFFFFF);
@@ -284,8 +285,8 @@ final class Panel implements PanelRoot.Host {
                 add(air, 3 * (u + g), y, u, u, row);
 
                 bt = wide(R.drawable.ic_bluetooth, "Bluetooth", accent);
-                bt.onClick = () -> launch(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS));
-                bt.onLongClick = bt.onClick;
+                bt.onClick = this::toggleBt;
+                bt.onLongClick = () -> launch(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS));
                 add(bt, 0, y + u + g, 2 * u + g, u, row + 1);
 
                 hotspot = round(R.drawable.ic_hotspot, 0xFF30D158, 0xFFFFFFFF);
@@ -296,8 +297,8 @@ final class Panel implements PanelRoot.Host {
 
                 loc = round(R.drawable.ic_location, accent, onColor(accent));
                 loc.setTitle("Location");
-                loc.onClick = () -> launch(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));
-                loc.onLongClick = loc.onClick;
+                loc.onClick = this::toggleLocation;
+                loc.onLongClick = () -> launch(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));
                 add(loc, 3 * (u + g), y + u + g, u, u, row + 1);
             }
             y += 2 * u + 2 * g;
@@ -830,6 +831,51 @@ final class Panel implements PanelRoot.Host {
             case "ringer": launch(new Intent(Settings.ACTION_SOUND_SETTINGS)); return;
             case "camera": launch(new Intent(MediaStore.INTENT_ACTION_VIDEO_CAMERA)); return;
             default: showHint(Tiles.label(id));
+        }
+    }
+
+    @SuppressWarnings("deprecation")
+    private void toggleWifi() {
+        boolean on = wifiMgr != null && wifiMgr.isWifiEnabled();
+        boolean ok = false;
+        try { ok = wifiMgr.setWifiEnabled(!on); } catch (Exception ignored) { }
+        if (ok) {
+            wifi.setActive(!on);
+            wifi.setSub(!on ? "Turning on…" : "Off");
+            showHint(!on ? "Wi-Fi on" : "Wi-Fi off");
+        } else {
+            launchPanel("android.settings.panel.action.WIFI", Settings.ACTION_WIFI_SETTINGS);
+        }
+    }
+
+    @SuppressWarnings({"deprecation", "MissingPermission"})
+    private void toggleBt() {
+        boolean ok = false, on = btEnabled();
+        try {
+            BluetoothManager bmgr = s.getSystemService(BluetoothManager.class);
+            BluetoothAdapter a = bmgr == null ? null : bmgr.getAdapter();
+            if (a != null) ok = on ? a.disable() : a.enable();
+        } catch (Exception ignored) { }
+        if (ok) {
+            bt.setActive(!on);
+            bt.setSub(!on ? "Turning on…" : "Off");
+            showHint(!on ? "Bluetooth on" : "Bluetooth off");
+        } else {
+            launch(new Intent(Settings.ACTION_BLUETOOTH_SETTINGS));
+        }
+    }
+
+    @SuppressWarnings("deprecation")
+    private void toggleLocation() {
+        LocationManager lm = s.getSystemService(LocationManager.class);
+        boolean on = lm != null && lm.isLocationEnabled();
+        try {
+            Settings.Secure.putInt(s.getContentResolver(), Settings.Secure.LOCATION_MODE,
+                    on ? Settings.Secure.LOCATION_MODE_OFF : Settings.Secure.LOCATION_MODE_HIGH_ACCURACY);
+            loc.setActive(!on);
+            showHint(!on ? "Location on" : "Location off");
+        } catch (Exception e) {
+            launch(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));
         }
     }
 

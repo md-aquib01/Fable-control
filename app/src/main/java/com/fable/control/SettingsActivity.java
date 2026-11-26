@@ -162,6 +162,7 @@ public class SettingsActivity extends Activity {
             dot.setOnClickListener(v -> { sp.edit().putInt(Prefs.ACCENT, idx).apply(); render(); });
         }
         c.addView(sw);
+        toggle(c, "Glass buttons", "See-through white buttons instead of dark ones", Prefs.GLASS, true);
         seek(c, "Background blur", Prefs.BLUR, 0, 100, 60, "%");
         seek(c, "Background darkness", Prefs.DIM, 0, 90, 45, "%");
         seek(c, "Panel size", Prefs.SCALE, 80, 115, 100, "%");
@@ -235,7 +236,8 @@ public class SettingsActivity extends Activity {
                 "Swipe up anywhere, tap empty space, or press back to close.",
                 "Long-press brightness to switch auto-brightness. Long-press volume for all volume controls.",
                 "Long-press Wi-Fi, Bluetooth, Focus or Alarm to jump to their full settings.",
-                "Android doesn't let apps switch Wi-Fi, Bluetooth, mobile data or airplane mode directly, so those open Android's quick pop-up instead.",
+                "Tap Wi-Fi or Bluetooth to switch them, hold for their settings. Android doesn't let any app switch mobile data, airplane mode or hotspot, so those open their settings.",
+                "Location can switch with one tap after a one-time command from a PC (see the repo README); otherwise it opens location settings.",
                 "The panel only uses battery while it's open. The swipe strip is a tiny invisible view."
         };
         for (String t : tips) {

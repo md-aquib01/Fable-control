@@ -113,7 +113,7 @@ final class MediaView extends View {
         // output button
         bg.setColor(pressedZone == OUTPUT ? 0x55FFFFFF : 0x2EFFFFFF);
         c.drawCircle(outX(), outY(), outR(), bg);
-        int cs = (int) (outR() * 1.05f);
+        int cs = (int) (outR() * 0.9f);
         dCast.setBounds((int) (outX() - cs / 2f), (int) (outY() - cs / 2f), (int) (outX() + cs / 2f), (int) (outY() + cs / 2f));
         dCast.setTint(0xFFFFFFFF);
         dCast.draw(c);
@@ -133,9 +133,9 @@ final class MediaView extends View {
         // controls
         float cy = ctrlY();
         int tint = hasSession ? 0xFFFFFFFF : 0x66FFFFFF;
-        drawCtrl(c, dPrev, w * 0.2f, cy, w * 0.13f, tint, PREV);
-        drawCtrl(c, playing ? dPause : dPlay, w * 0.5f, cy, w * 0.15f, tint, PLAY);
-        drawCtrl(c, dNext, w * 0.8f, cy, w * 0.13f, tint, NEXT);
+        drawCtrl(c, dPrev, w * 0.2f, cy, w * 0.11f, tint, PREV);
+        drawCtrl(c, playing ? dPause : dPlay, w * 0.5f, cy, w * 0.13f, tint, PLAY);
+        drawCtrl(c, dNext, w * 0.8f, cy, w * 0.11f, tint, NEXT);
     }
 
     private void drawCtrl(Canvas c, Drawable d, float cx, float cy, float size, int tint, int zone) {

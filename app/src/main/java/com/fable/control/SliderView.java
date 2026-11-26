@@ -91,7 +91,7 @@ final class SliderView extends View {
         c.drawRect(0, top, w, h, fill);
         c.restore();
         if (icon != null) {
-            int s = (int) (w * 0.34f);
+            int s = (int) (w * 0.28f);
             float cy = h - w * 0.5f;
             icon.setBounds((int) (w / 2f - s / 2f), (int) (cy - s / 2f), (int) (w / 2f + s / 2f), (int) (cy + s / 2f));
             int t = top < cy ? onTint : 0xFFFFFFFF;
