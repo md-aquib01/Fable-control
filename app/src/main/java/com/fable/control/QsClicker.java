@@ -65,10 +65,16 @@ final class QsClicker {
     }
 
     private void dialog(String[] row, Done done, long start) {
-        AccessibilityNodeInfo label = find(row, false);
-        AccessibilityNodeInfo sw = label == null ? null : switchNear(label);
-        // The mobile row is often titled with the carrier name, so fall back to "the switch that isn't Wi-Fi".
-        if (sw == null && row[0].startsWith("Mobile") && SystemClock.uptimeMillis() - start > 600) sw = nonWifiSwitch();
+        boolean mobile = row[0].startsWith("Mobile");
+        // 1) The Internet pop-up's own switches have fixed ids — the most reliable match.
+        AccessibilityNodeInfo sw = byId(mobile ? "mobile_toggle" : "wifi_toggle");
+        // 2) Otherwise look for the label, but only inside the pop-up (Quick Settings tiles are switches too).
+        if (sw == null) {
+            AccessibilityNodeInfo label = findIn(dialogRoots(), row);
+            if (label != null) sw = switchNear(label);
+        }
+        // 3) The mobile row is usually titled with the carrier name: take the pop-up's switch that isn't Wi-Fi.
+        if (sw == null && mobile && SystemClock.uptimeMillis() - start > 700) sw = nonWifiSwitch();
         if (sw == null) {
             if (SystemClock.uptimeMillis() - start > 2000) { clickText(new String[]{"Done"}); finish(false, done); return; }
             h.postDelayed(() -> dialog(row, done, start), 90);
@@ -79,7 +85,9 @@ final class QsClicker {
         h.postDelayed(() -> {
             clickText(new String[]{"Turn off"});
             h.postDelayed(() -> {
-                clickText(new String[]{"Done"});
+                AccessibilityNodeInfo d = byId("done_button");
+                if (d != null) d.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                else clickText(new String[]{"Done"});
                 finish(true, done);
             }, 200);
         }, 350);
@@ -181,14 +189,53 @@ final class QsClicker {
         return null;
     }
 
+    private List<AccessibilityNodeInfo> sysuiRoots() {
+        java.util.ArrayList<AccessibilityNodeInfo> out = new java.util.ArrayList<>();
+        try {
+            for (AccessibilityWindowInfo w : s.getWindows()) {
+                AccessibilityNodeInfo root = w.getRoot();
+                if (root != null && root.getPackageName() != null && SYSUI.contentEquals(root.getPackageName())) out.add(root);
+            }
+        } catch (Exception ignored) { }
+        return out;
+    }
+
+    /** Windows that look like the Internet pop-up (they have a "Done" button). */
+    private List<AccessibilityNodeInfo> dialogRoots() {
+        java.util.ArrayList<AccessibilityNodeInfo> out = new java.util.ArrayList<>();
+        for (AccessibilityNodeInfo r : sysuiRoots()) {
+            if (!r.findAccessibilityNodeInfosByText("Done").isEmpty()
+                    || !r.findAccessibilityNodeInfosByViewId(SYSUI + ":id/done_button").isEmpty()) out.add(r);
+        }
+        return out;
+    }
+
+    private AccessibilityNodeInfo byId(String id) {
+        for (AccessibilityNodeInfo r : sysuiRoots()) {
+            for (AccessibilityNodeInfo n : r.findAccessibilityNodeInfosByViewId(SYSUI + ":id/" + id)) {
+                if (n.isVisibleToUser() && n.isEnabled()) return n;
+            }
+        }
+        return null;
+    }
+
+    private AccessibilityNodeInfo findIn(List<AccessibilityNodeInfo> roots, String[] labels) {
+        for (AccessibilityNodeInfo r : roots) {
+            for (String l : labels) {
+                for (AccessibilityNodeInfo n : r.findAccessibilityNodeInfosByText(l)) {
+                    if (n.isVisibleToUser() && starts(n, l)) return n;
+                }
+            }
+        }
+        return null;
+    }
+
     private AccessibilityNodeInfo nonWifiSwitch() {
-        AccessibilityNodeInfo wl = find(new String[]{"Wi-Fi", "Wi‑Fi", "WLAN"}, false);
-        AccessibilityNodeInfo wifiSw = wl == null ? null : switchNear(wl);
-        List<AccessibilityWindowInfo> wins;
-        try { wins = s.getWindows(); } catch (Exception e) { return null; }
-        for (AccessibilityWindowInfo w : wins) {
-            AccessibilityNodeInfo root = w.getRoot();
-            if (root == null || root.getPackageName() == null || !SYSUI.contentEquals(root.getPackageName())) continue;
+        List<AccessibilityNodeInfo> roots = dialogRoots();
+        AccessibilityNodeInfo wl = findIn(roots, new String[]{"Wi-Fi", "Wi\u2011Fi", "WLAN"});
+        AccessibilityNodeInfo wifiSw = byId("wifi_toggle");
+        if (wifiSw == null && wl != null) wifiSw = switchNear(wl);
+        for (AccessibilityNodeInfo root : roots) {
             ArrayDeque<AccessibilityNodeInfo> q = new ArrayDeque<>();
             q.add(root);
             int seen = 0;

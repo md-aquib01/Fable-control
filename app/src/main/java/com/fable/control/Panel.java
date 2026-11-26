@@ -218,9 +218,8 @@ final class Panel implements PanelRoot.Host {
         TileView.HAPTICS = sp.getBoolean(Prefs.HAPTICS, true);
         TileView.ROUNDNESS = sp.getInt(Prefs.ROUND, 100) / 100f;
         boolean glassOn = sp.getBoolean(Prefs.GLASS, true);
-        Glass.LIQUID = glassOn && sp.getBoolean(Prefs.LIQUID, true);
-        Glass.DENSITY = density;
-        TileView.IDLE_BG = !glassOn ? 0xA6161618 : Glass.LIQUID ? 0x2EFFFFFF : 0x24FFFFFF;
+        Glass.LIQUID = false;
+        TileView.IDLE_BG = glassOn ? 0x24FFFFFF : 0xA6161618;
         maxBlur = Math.round(sp.getInt(Prefs.BLUR, 60) / 100f * dp(40));
         dimAlpha = sp.getInt(Prefs.DIM, 45) / 100f;
         tiles.clear();

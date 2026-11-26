@@ -216,7 +216,6 @@ public class SettingsActivity extends Activity {
         }
         c.addView(sw);
         toggle(c, "Glass buttons", "See-through white buttons instead of dark ones", Prefs.GLASS, true);
-        toggle(c, "Liquid glass", "Light catches the rims and a soft sheen sits on top of each glass button", Prefs.LIQUID, true);
         seek(c, "Background blur", Prefs.BLUR, 0, 100, 60, "%");
         seek(c, "Background darkness", Prefs.DIM, 0, 90, 45, "%");
         seek(c, "Panel size", Prefs.SCALE, 80, 115, 100, "%");

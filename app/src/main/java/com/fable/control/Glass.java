@@ -13,7 +13,7 @@ import android.graphics.Shader;
  * window blur instead of an SVG displacement filter.
  */
 final class Glass {
-    static boolean LIQUID = true;
+    static boolean LIQUID = false;
     static float DENSITY = 3f;
 
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
