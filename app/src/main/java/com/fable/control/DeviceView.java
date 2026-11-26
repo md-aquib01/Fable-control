@@ -96,7 +96,7 @@ final class DeviceView extends View {
         int a = Math.round(alpha * 255);
 
         // photo (fit inside the top part)
-        float top = h * 0.08f, bottom = h * 0.62f, side = w * 0.12f;
+        float top = h * 0.05f, bottom = h * 0.63f, side = w * 0.06f;
         if (d.photo != null && !d.photo.isRecycled()) {
             float bw = d.photo.getWidth(), bh = d.photo.getHeight();
             float s = Math.min((w - 2 * side) / bw, (bottom - top) / bh);
@@ -117,11 +117,11 @@ final class DeviceView extends View {
         np.setTextSize(w * 0.105f);
         np.setAlpha(a);
         CharSequence n = TextUtils.ellipsize(d.name, np, avail, TextUtils.TruncateAt.END);
-        c.drawText(n, 0, n.length(), w / 2f, h * 0.76f, np);
+        c.drawText(n, 0, n.length(), w / 2f, h * 0.735f, np);
         sp.setTextSize(w * 0.088f);
         sp.setAlpha(Math.round(a * 0.6f));
         String st = d.connected ? (d.battery >= 0 ? "Connected · " + d.battery + "%" : "Connected") : "Saved";
-        c.drawText(st, w / 2f, h * 0.875f, sp);
+        c.drawText(st, w / 2f, h * 0.835f, sp);
         c.restore();
 
         // page dots
@@ -130,7 +130,7 @@ final class DeviceView extends View {
             float r = w * 0.016f, gap = w * 0.055f, sx = w / 2f - (n2 - 1) * gap / 2f;
             for (int i = 0; i < n2; i++) {
                 dot.setColor(i == index ? 0xFFFFFFFF : 0x4DFFFFFF);
-                c.drawCircle(sx + i * gap, h * 0.95f, r, dot);
+                c.drawCircle(sx + i * gap, h * 0.905f, r, dot);
             }
         }
     }
