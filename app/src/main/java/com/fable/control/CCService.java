@@ -44,6 +44,7 @@ public class CCService extends AccessibilityService implements SharedPreferences
         sp = Prefs.get(this);
         sp.registerOnSharedPreferenceChangeListener(this);
         panel = new Panel(this);
+        remember(getResources().getConfiguration());
         addEdge();
         IntentFilter f = new IntentFilter(Intent.ACTION_SCREEN_OFF);
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(screenOff, f, Context.RECEIVER_EXPORTED);
@@ -58,10 +59,19 @@ public class CCService extends AccessibilityService implements SharedPreferences
     @Override
     public void onInterrupt() { }
 
+    private int lastW, lastH, lastOrient, lastDensity;
+
     @Override
     public void onConfigurationChanged(Configuration c) {
         super.onConfigurationChanged(c);
+        // Only rebuild for real layout changes (rotation, size, font scale) — not dark-theme switches.
+        if (c.screenWidthDp == lastW && c.screenHeightDp == lastH && c.orientation == lastOrient && c.densityDpi == lastDensity) return;
+        remember(c);
         reload();
+    }
+
+    private void remember(Configuration c) {
+        lastW = c.screenWidthDp; lastH = c.screenHeightDp; lastOrient = c.orientation; lastDensity = c.densityDpi;
     }
 
     @Override

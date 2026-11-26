@@ -32,7 +32,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import rikka.shizuku.Shizuku;
 
 /** Setup checklist plus every customisation option, built in code to keep the app tiny. */
 public class SettingsActivity extends Activity {
@@ -44,29 +43,6 @@ public class SettingsActivity extends Activity {
     private ScrollView scroll;
     private int accent;
     private List<AppTiles.T> appTiles;
-    private boolean granting;
-
-    private final Shizuku.OnRequestPermissionResultListener permL = (code, result) -> {
-        if (code == Shell.REQ && result == PackageManager.PERMISSION_GRANTED) grantAll();
-        else render();
-    };
-    private final Shizuku.OnBinderReceivedListener binderL = () -> runOnUiThread(this::render);
-
-    private void grantAll() {
-        granting = true;
-        render();
-        Shell.run(Shell.grantAllScript(this), ok -> { granting = false; render(); });
-    }
-
-    @Override
-    protected void onDestroy() {
-        try {
-            Shizuku.removeRequestPermissionResultListener(permL);
-            Shizuku.removeBinderReceivedListener(binderL);
-        } catch (Throwable ignored) { }
-        super.onDestroy();
-    }
-
     private int dp(float v) { return Math.round(v * getResources().getDisplayMetrics().density); }
 
     @Override
@@ -83,10 +59,6 @@ public class SettingsActivity extends Activity {
         list.setPadding(dp(16), dp(20), dp(16), dp(40));
         scroll.addView(list, new FrameLayout.LayoutParams(-1, -2));
         setContentView(scroll);
-        try {
-            Shizuku.addRequestPermissionResultListener(permL);
-            Shizuku.addBinderReceivedListenerSticky(binderL);
-        } catch (Throwable ignored) { }
     }
 
     @Override
@@ -126,37 +98,6 @@ public class SettingsActivity extends Activity {
         boolean write = Settings.System.canWrite(this);
         boolean media = isListenerOn();
         boolean dnd = getSystemService(NotificationManager.class).isNotificationPolicyAccessGranted();
-
-        // Shizuku: unlocks one-tap switching and can grant everything below automatically.
-        boolean shInstalled = Shell.installed(this), shRunning = Shell.running(), shReady = Shell.ready();
-        String shSub, shState;
-        Runnable shFix;
-        if (shReady) {
-            shState = granting ? "Working…" : "On";
-            shSub = (a11y && write && media && dnd) ? "Every button switches with one tap"
-                    : "Tap to grant the permissions below automatically";
-            shFix = this::grantAll;
-        } else if (shRunning) {
-            shState = "Allow ›";
-            shSub = "Tap, then choose Allow in the Shizuku pop-up";
-            shFix = Shell::request;
-        } else if (shInstalled) {
-            shState = "Start ›";
-            shSub = "Open Shizuku and tap Start (redo after each restart)";
-            shFix = () -> {
-                Intent i = getPackageManager().getLaunchIntentForPackage(Shell.SHIZUKU_PKG);
-                if (i != null) start(i);
-            };
-        } else {
-            shState = "Get ›";
-            shSub = "Free app that lets mobile data, airplane, location and more switch with one tap";
-            shFix = () -> {
-                try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=" + Shell.SHIZUKU_PKG))); }
-                catch (Exception e) { start(new Intent(Intent.ACTION_VIEW, Uri.parse("https://shizuku.rikka.app/download/"))); }
-            };
-        }
-        TextView shT = text(shState, 14, shReady && !granting ? 0xFF30D158 : accent, true);
-        row(c, "Shizuku (one-tap everything)", shSub, shT, shFix);
 
         permRow(c, "Turn on Fable Control", "Required. Settings → Accessibility → Fable Control", a11y,
                 () -> start(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
@@ -320,9 +261,8 @@ public class SettingsActivity extends Activity {
                 "Long-press brightness to switch auto-brightness. Long-press volume for all volume controls.",
                 "Long-press Wi-Fi, Bluetooth, Focus or Alarm to jump to their full settings.",
                 "Tap any button to switch it, hold it for its settings.",
-                "Mobile data, airplane mode, location, battery saver, NFC, data saver, dark theme and app tiles need Shizuku running to switch. Without it, they open their settings.",
-                "Hotspot always opens its settings: Android has no switch for it outside the system itself.",
-                "The first time you tap an app's tile, it's also added to your normal Quick Settings — that's how Android lets it be pressed.",
+                "Android doesn't let apps switch mobile data, airplane mode, hotspot, location, battery saver, NFC, data saver or dark theme, so Fable Control presses the matching tile in your phone's own Quick Settings for you. You may see a quick flicker behind the panel.",
+                "For that to work, the tile must be in your phone's Quick Settings (pull down twice → pencil icon). The same goes for app tiles like Intra: add Intra there once.",
                 "The panel only uses battery while it's open. The swipe strip is a tiny invisible view."
         };
         for (String t : tips) {

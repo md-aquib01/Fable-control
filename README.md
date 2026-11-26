@@ -18,5 +18,5 @@ An iOS-style control center for stock Android (built for Moto phones). Tiny (no 
 
 Built automatically by GitHub Actions on every push.
 
-## One-tap everything (Shizuku)
-Install the free **Shizuku** app, start it (Wireless debugging, no PC needed), then tap the Shizuku row in Fable Control's Setup and choose Allow. That makes mobile data, airplane mode, location, battery saver, NFC, data saver, dark theme and other apps' tiles (e.g. Intra) switch with one tap, and grants all of Fable Control's other permissions automatically. Restart Shizuku after each phone reboot.
+## How the toggles work
+Android doesn't let apps switch mobile data, airplane mode, hotspot, location, battery saver, NFC, data saver, dark theme or other apps' tiles. Fable Control presses the matching tile in your phone's own Quick Settings for you (through its Accessibility permission), so those tiles must be present in your Quick Settings. No Shizuku, root or developer options needed.
