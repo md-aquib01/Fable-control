@@ -220,8 +220,10 @@ final class Panel implements PanelRoot.Host {
         TileView.HAPTICS = sp.getBoolean(Prefs.HAPTICS, true);
         TileView.ROUNDNESS = sp.getInt(Prefs.ROUND, 100) / 100f;
         boolean glassOn = sp.getBoolean(Prefs.GLASS, true);
-        Glass.LIQUID = false;
-        TileView.IDLE_BG = glassOn ? 0x24FFFFFF : 0xA6161618;
+        Glass.LIQUID = sp.getBoolean(Prefs.LIQUID, true);
+        Glass.DENSITY = density;
+        // Liquid glass: dark tinted glass with a thin light outline (see the reference widgets).
+        TileView.IDLE_BG = Glass.LIQUID ? 0x800A1018 : glassOn ? 0x24FFFFFF : 0xA6161618;
         maxBlur = Math.round(sp.getInt(Prefs.BLUR, 60) / 100f * dp(40));
         dimAlpha = sp.getInt(Prefs.DIM, 45) / 100f;
         tiles.clear();
@@ -458,6 +460,7 @@ final class Panel implements PanelRoot.Host {
         GradientDrawable cb = new GradientDrawable();
         cb.setColor(TileView.IDLE_BG);
         cb.setCornerRadius(u);
+        if (Glass.LIQUID) cb.setStroke(Math.max(1, Math.round(density * 0.75f)), 0x4DFFFFFF);
         clear.setBackground(cb);
         clear.setOnClickListener(v -> clearAll());
         head.addView(clear);
@@ -606,6 +609,7 @@ final class Panel implements PanelRoot.Host {
             // Notifications waiting → compact page; nothing to show → straight to the full centre.
             int count = pagesEnabled && notifList != null ? countNotifs() : 0;
             pagingActive = pagesEnabled && count > 0;
+            if (deviceView != null) deviceView.resetIndex();
             setPage(pagingActive ? 0 : 1);
             setProgress(0);
             try {
@@ -957,7 +961,12 @@ final class Panel implements PanelRoot.Host {
             vol.setValue(max > 0 ? idx / (float) max : 0);
             vol.setIcon(idx == 0 ? R.drawable.ic_mute : R.drawable.ic_volume);
         }
-        if (deviceView != null) { Devices.refresh(devs); deviceView.changed(); }
+        if (deviceView != null) {
+            Devices.refresh(devs);
+            // Connected devices first, so the card always opens on what you're using.
+            devs.sort((a, b) -> Boolean.compare(b.connected, a.connected));
+            deviceView.changed();
+        }
         bindMedia();
         renderNotifs();
     }

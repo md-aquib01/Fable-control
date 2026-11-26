@@ -28,11 +28,12 @@ final class Glass {
     private void shaders(float left, float top, float right, float bottom) {
         if (left == l && top == t && right - left == w && bottom - top == h) return;
         l = left; t = top; w = right - left; h = bottom - top;
-        sheen.setShader(new LinearGradient(0, top, 0, top + h * 0.75f,
-                0x2EFFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP));
+        sheen.setShader(new LinearGradient(0, top, 0, top + h * 0.8f,
+                0x0FFFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP));
+        // Thin light outline like the reference widgets: a touch brighter at the top-left and bottom-right.
         rim.setShader(new LinearGradient(left, top, right, bottom,
-                new int[]{0xB3FFFFFF, 0x24FFFFFF, 0x0FFFFFFF, 0x26FFFFFF, 0x8CFFFFFF},
-                new float[]{0f, 0.28f, 0.5f, 0.72f, 1f}, Shader.TileMode.CLAMP));
+                new int[]{0x70FFFFFF, 0x40FFFFFF, 0x30FFFFFF, 0x40FFFFFF, 0x66FFFFFF},
+                new float[]{0f, 0.3f, 0.5f, 0.7f, 1f}, Shader.TileMode.CLAMP));
     }
 
     void rect(Canvas c, float left, float top, float right, float bottom, float rad, int color) {
@@ -47,7 +48,7 @@ final class Glass {
     void rimOnly(Canvas c, float left, float top, float right, float bottom, float rad) {
         if (!LIQUID) return;
         shaders(left, top, right, bottom);
-        float sw = Math.max(1f, DENSITY * 0.9f);
+        float sw = Math.max(1f, DENSITY * 0.75f);
         rim.setStrokeWidth(sw);
         float i = sw / 2f;
         c.drawRoundRect(left + i, top + i, right - i, bottom - i, Math.max(0, rad - i), Math.max(0, rad - i), rim);

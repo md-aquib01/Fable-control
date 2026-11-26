@@ -244,7 +244,9 @@ public class SettingsActivity extends Activity {
             dot.setOnClickListener(v -> { sp.edit().putInt(Prefs.ACCENT, idx).apply(); render(); });
         }
         c.addView(sw);
-        toggle(c, "Glass buttons", "See-through white buttons instead of dark ones", Prefs.GLASS, true);
+        toggle(c, "Liquid glass", "Dark tinted glass with a thin light outline around every button", Prefs.LIQUID, true);
+        if (!sp.getBoolean(Prefs.LIQUID, true))
+            toggle(c, "Glass buttons", "See-through white buttons instead of dark ones", Prefs.GLASS, true);
         seek(c, "Background blur", Prefs.BLUR, 0, 100, 60, "%");
         seek(c, "Background darkness", Prefs.DIM, 0, 90, 45, "%");
         seek(c, "Panel size", Prefs.SCALE, 75, 125, 100, "%");
@@ -593,6 +595,7 @@ public class SettingsActivity extends Activity {
             boolean n = !sp.getBoolean(key, def);
             sp.edit().putBoolean(key, n).apply();
             s.setChecked(n);
+            if (Prefs.LIQUID.equals(key)) render();
         });
     }
 

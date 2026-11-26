@@ -32,6 +32,7 @@ final class DeviceView extends View {
     private int index;
     private float offset;              // horizontal drag while swiping
     private final Paint bg = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Glass glass = new Glass();
     private final Paint bmp = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
     private final Paint dot = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final TextPaint np = new TextPaint(Paint.ANTI_ALIAS_FLAG);
@@ -68,7 +69,15 @@ final class DeviceView extends View {
         invalidate();
     }
 
-    void changed() { invalidate(); }
+    private boolean userSwiped;
+
+    /** Back to the first (connected) device each time the panel opens. */
+    void resetIndex() { index = 0; userSwiped = false; invalidate(); }
+
+    void changed() {
+        if (!userSwiped) index = 0;   // follow the connected device unless you swiped away yourself
+        invalidate();
+    }
 
     private Devices.Dev cur() { return devs.isEmpty() ? null : devs.get(Math.min(index, devs.size() - 1)); }
 
@@ -76,8 +85,7 @@ final class DeviceView extends View {
     protected void onDraw(Canvas c) {
         int w = getWidth(), h = getHeight();
         float rad = Math.min(w, h) * 0.2f * TileView.ROUNDNESS + w * 0.04f;
-        bg.setColor(TileView.IDLE_BG);
-        c.drawRoundRect(0, 0, w, h, rad, rad, bg);
+        glass.rect(c, 0, 0, w, h, rad, TileView.IDLE_BG);
         Devices.Dev d = cur();
         if (d == null) return;
 
@@ -154,6 +162,7 @@ final class DeviceView extends View {
                 if (swiping) {
                     if (Math.abs(dx) > getWidth() * 0.25f) {
                         index = (index + (dx < 0 ? 1 : devs.size() - 1)) % devs.size();
+                        userSwiped = true;
                         TileView.buzz(this, HapticFeedbackConstants.CLOCK_TICK);
                     }
                     offset = 0;
