@@ -247,7 +247,7 @@ public class SettingsActivity extends Activity {
         toggle(c, "Glass buttons", "See-through white buttons instead of dark ones", Prefs.GLASS, true);
         seek(c, "Background blur", Prefs.BLUR, 0, 100, 60, "%");
         seek(c, "Background darkness", Prefs.DIM, 0, 90, 45, "%");
-        seek(c, "Panel size", Prefs.SCALE, 80, 115, 100, "%");
+        seek(c, "Panel size", Prefs.SCALE, 75, 125, 100, "%");
         seek(c, "Button roundness", Prefs.ROUND, 45, 100, 100, "%");
         TextView note = text("Blur needs Android 12 or newer and is switched off by the system while Battery Saver is on.", 13, SUB, false);
         note.setPadding(dp(16), dp(4), dp(16), dp(14));

@@ -249,9 +249,9 @@ final class Panel implements PanelRoot.Host {
 
         float margin = Math.max(dp(16), W * 0.07f);
         float width = Math.min(W - 2 * margin, dp(420)) * sp.getInt(Prefs.SCALE, 100) / 100f;
-        width = Math.min(width, W - dp(12));
+        width = Math.min(width, W - dp(6));
         float top = sbH + dp(14);
-        float avail = H - top - navH - dp(60);
+        float avail = H - top - navH - dp(28);
         geometry(width);
         boolean conn = sp.getBoolean(Prefs.SEC_CONN, true);
         float total = hh + g * 0.7f + (conn ? 2 * u + 2 * g : 0) + placeFull(null, 0);
