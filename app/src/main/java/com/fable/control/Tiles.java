@@ -33,7 +33,7 @@ final class Tiles {
             case "split": return "Split screen";
             case "notif": return "Notifications";
             case "settings": return "Settings";
-            case "off": return "Turn off (for payments)";
+            case "off": return "Payment mode";
         }
         return id;
     }

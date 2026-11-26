@@ -1197,8 +1197,8 @@ final class Panel implements PanelRoot.Host {
             case "notif": global(AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS, 220); return;
             case "settings": launch(new Intent(Settings.ACTION_SETTINGS)); return;
             case "off":
-                showHint("Fable Control off. Hold both volume keys to turn it back on");
-                h.postDelayed(() -> { closeNow(); s.disableSelf(); }, 1100);
+                showHint("Payment mode on. Open Fable Control to turn it back on");
+                h.postDelayed(() -> CCService.goDark(s), 1100);
                 return;
         }
     }

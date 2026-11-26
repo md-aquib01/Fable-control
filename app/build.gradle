@@ -8,8 +8,8 @@ android {
         applicationId 'com.fable.control'
         minSdk 28
         targetSdk 28
-        versionCode 14
-        versionName '2.3'
+        versionCode 15
+        versionName '2.4'
     }
 
     signingConfigs {

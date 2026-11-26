@@ -25,6 +25,38 @@ public class CCService extends AccessibilityService implements SharedPreferences
 
     static CCService instance;
 
+    /**
+     * Payment mode: switch the service off and then hide it from Android completely, so payment and
+     * banking apps no longer see an app with Accessibility powers. Opening Fable Control restores it.
+     */
+    static void goDark(Context c) {
+        Context app = c.getApplicationContext();
+        CCService s = instance;
+        if (s != null) {
+            if (s.panel != null) s.panel.closeNow();
+            try { s.disableSelf(); } catch (Exception ignored) { }
+        }
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> setServiceEnabled(app, false), 400);
+    }
+
+    static void setServiceEnabled(Context c, boolean on) {
+        try {
+            c.getPackageManager().setComponentEnabledSetting(new android.content.ComponentName(c, CCService.class),
+                    on ? android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DEFAULT
+                       : android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                    android.content.pm.PackageManager.DONT_KILL_APP);
+        } catch (Exception ignored) { }
+    }
+
+    static boolean serviceHidden(Context c) {
+        try {
+            return c.getPackageManager().getComponentEnabledSetting(new android.content.ComponentName(c, CCService.class))
+                    == android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     Panel panel;
     private WindowManager wm;
     private SharedPreferences sp;

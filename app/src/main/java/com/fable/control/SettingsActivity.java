@@ -73,8 +73,9 @@ public class SettingsActivity extends Activity {
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         sp = Prefs.get(this);
-        // Opening the app starts Fable Control again after an Exit.
+        // Opening the app starts Fable Control again after an Exit / payment mode.
         if (sp.getBoolean(Prefs.PAUSED, false)) sp.edit().putBoolean(Prefs.PAUSED, false).apply();
+        if (CCService.serviceHidden(this)) CCService.setServiceEnabled(this, true);
         getWindow().setStatusBarColor(BG);
         getWindow().setNavigationBarColor(BG);
         scroll = new ScrollView(this);
@@ -140,8 +141,6 @@ public class SettingsActivity extends Activity {
                 () -> start(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)));
         permRow(c, "Do Not Disturb access", "Focus tile and silent mode", dnd,
                 () -> start(new Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)));
-        row(c, "Quick on/off shortcut", "Lets you switch Fable Control off before paying and on again after. Open it, turn on \"Fable Control shortcut\" and pick \"Hold volume keys\".",
-                null, this::openA11yDetails);
         row(c, "Says \"Restricted setting\"?", "Open App info → ⋮ menu → Allow restricted settings, then try again",
                 null, () -> start(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName()))));
 
@@ -450,17 +449,17 @@ public class SettingsActivity extends Activity {
 
     private void exitCard() {
         LinearLayout c = card("Exit");
-        TextView t = text("Exit Fable Control", 16, 0xFFFF453A, true);
+        TextView t = text("Payment mode (turn off)", 16, 0xFFFF453A, true);
         LinearLayout r = new LinearLayout(this);
         r.setOrientation(LinearLayout.VERTICAL);
         r.setPadding(dp(16), dp(14), dp(16), dp(14));
         r.addView(t);
-        TextView sub = text("Fully turns Fable Control off, so payment and banking apps work. To turn it back on: hold both volume keys for 3 seconds (after setting up the shortcut below), or tap \"Turn on Fable Control\" in Setup.", 13, SUB, false);
+        TextView sub = text("Payment mode: fully turns Fable Control off and hides it from Android, so payment and banking apps work. Open this app again to bring it back (you may need to tap \"Turn on Fable Control\" once).", 13, SUB, false);
         sub.setPadding(0, dp(4), 0, 0);
         r.addView(sub);
         r.setBackground(new RippleDrawable(ColorStateList.valueOf(0x22FFFFFF), null, null));
         r.setOnClickListener(v -> {
-            if (CCService.instance != null) CCService.instance.disableSelf();
+            CCService.goDark(this);
             finishAndRemoveTask();
         });
         c.addView(r);
