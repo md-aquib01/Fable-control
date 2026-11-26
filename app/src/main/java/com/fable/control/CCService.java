@@ -43,9 +43,11 @@ public class CCService extends AccessibilityService implements SharedPreferences
         wm = getSystemService(WindowManager.class);
         sp = Prefs.get(this);
         sp.registerOnSharedPreferenceChangeListener(this);
-        panel = new Panel(this);
         remember(getResources().getConfiguration());
-        addEdge();
+        if (!sp.getBoolean(Prefs.PAUSED, false)) {
+            panel = new Panel(this);
+            addEdge();
+        }
         IntentFilter f = new IntentFilter(Intent.ACTION_SCREEN_OFF);
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(screenOff, f, Context.RECEIVER_EXPORTED);
         else registerReceiver(screenOff, f);
@@ -76,7 +78,18 @@ public class CCService extends AccessibilityService implements SharedPreferences
 
     @Override
     public void onSharedPreferenceChanged(SharedPreferences p, String key) {
-        if (Prefs.AWAKE.equals(key) || Prefs.PREV_TIMEOUT.equals(key)) return;
+        if (Prefs.AWAKE.equals(key) || Prefs.PREV_TIMEOUT.equals(key) || (key != null && key.startsWith("qs_"))) return;
+        if (Prefs.PAUSED.equals(key)) {
+            if (p.getBoolean(Prefs.PAUSED, false)) {
+                // Exit: drop the panel and the swipe strip and free everything we hold.
+                if (panel != null) { panel.destroy(); panel = null; }
+                removeEdge();
+            } else if (panel == null) {
+                panel = new Panel(this);
+                addEdge();
+            }
+            return;
+        }
         reload();
     }
 
@@ -113,7 +126,7 @@ public class CCService extends AccessibilityService implements SharedPreferences
     private int dp(float v) { return Math.round(v * getResources().getDisplayMetrics().density); }
 
     private void addEdge() {
-        if (wm == null || edge != null) return;
+        if (wm == null || edge != null || panel == null) return;
         int mode = sp.getInt(Prefs.TRIGGER, Prefs.TRIG_TOP_RIGHT);
         int zone = sp.getInt(Prefs.ZONE, 45);
         int sw = getResources().getDisplayMetrics().widthPixels;

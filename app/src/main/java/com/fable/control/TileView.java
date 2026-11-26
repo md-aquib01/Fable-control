@@ -33,6 +33,7 @@ final class TileView extends View {
     Runnable onClick, onLongClick;
 
     private final Paint bg = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Glass glass = new Glass();
     private final TextPaint tp = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final TextPaint sp = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private int lastTint = 0;
@@ -104,9 +105,8 @@ final class TileView extends View {
         int w = getWidth(), h = getHeight();
         if (kind == ROUND) {
             float r = Math.min(w, h) / 2f;
-            bg.setColor(active ? onBg : IDLE_BG);
             float rr = r * ROUNDNESS;
-            c.drawRoundRect(w / 2f - r, h / 2f - r, w / 2f + r, h / 2f + r, rr, rr, bg);
+            glass.rect(c, w / 2f - r, h / 2f - r, w / 2f + r, h / 2f + r, rr, active ? onBg : IDLE_BG);
             if (icon != null) {
                 int s = (int) (r * 0.68f);
                 icon.setBounds((w - s) / 2, (h - s) / 2, (w + s) / 2, (h + s) / 2);
@@ -116,8 +116,7 @@ final class TileView extends View {
             return;
         }
         float rad = h * 0.5f * ROUNDNESS * 0.72f;
-        bg.setColor(IDLE_BG);
-        c.drawRoundRect(0, 0, w, h, rad, rad, bg);
+        glass.rect(c, 0, 0, w, h, rad, IDLE_BG);
         float cx = h * 0.5f, cy = h / 2f, cr = h * 0.30f;
         bg.setColor(active ? onBg : 0x26FFFFFF);
         c.drawCircle(cx, cy, cr, bg);

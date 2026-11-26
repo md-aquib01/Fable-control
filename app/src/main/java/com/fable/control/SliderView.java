@@ -34,6 +34,8 @@ final class SliderView extends View {
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint bp = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path clip = new Path();
+    private final Glass glass = new Glass();
+    private float clipR;
     private float lastY, downY;
     private boolean moved, atEdge;
     private int lastTint;
@@ -77,6 +79,7 @@ final class SliderView extends View {
     protected void onSizeChanged(int w, int h, int ow, int oh) {
         clip.reset();
         float r = w * 0.38f * TileView.ROUNDNESS + w * 0.08f;
+        clipR = r;
         clip.addRoundRect(0, 0, w, h, r, r, Path.Direction.CW);
     }
 
@@ -89,7 +92,9 @@ final class SliderView extends View {
         c.drawRect(0, 0, w, h, bg);
         float top = h * (1 - value);
         c.drawRect(0, top, w, h, fill);
+        glass.sheen(c, clip, 0, 0, w, h);
         c.restore();
+        glass.rimOnly(c, 0, 0, w, h, clipR);
         if (icon != null) {
             int s = (int) (w * 0.28f);
             float cy = h - w * 0.5f;

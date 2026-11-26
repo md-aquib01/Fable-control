@@ -3,7 +3,6 @@ package com.fable.control;
 import android.content.Context;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
-import android.graphics.drawable.GradientDrawable;
 import android.text.TextUtils;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -27,6 +26,13 @@ final class NotifCard extends LinearLayout {
     private float x0, y0;
     private boolean swiping, moved;
     private VelocityTracker vt;
+    private final float radius;
+    private final Glass glass = new Glass();
+
+    @Override
+    protected void onDraw(android.graphics.Canvas c) {
+        glass.rect(c, 0, 0, getWidth(), getHeight(), radius, TileView.IDLE_BG);
+    }
 
     NotifCard(Context c, float u, Drawable icon, boolean tintIcon, String app, String time,
               String title, String text, boolean clearable, Actions act) {
@@ -37,10 +43,8 @@ final class NotifCard extends LinearLayout {
         setOrientation(VERTICAL);
         int pad = Math.round(u * 0.2f);
         setPadding(pad, Math.round(pad * 0.85f), pad, pad);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(TileView.IDLE_BG);
-        bg.setCornerRadius(u * 0.28f * TileView.ROUNDNESS + u * 0.06f);
-        setBackground(bg);
+        radius = u * 0.28f * TileView.ROUNDNESS + u * 0.06f;
+        setWillNotDraw(false);
 
         LinearLayout top = new LinearLayout(c);
         top.setGravity(Gravity.CENTER_VERTICAL);

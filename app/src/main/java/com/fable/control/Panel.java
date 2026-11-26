@@ -113,7 +113,9 @@ final class Panel implements PanelRoot.Host {
     private float cw, g, u, hh, x0;
 
     // state
-    private boolean dirty = true, attached, registered, blurOk, pagesEnabled;
+    private boolean dirty = true, attached, registered, blurOk, pagesEnabled, pagingActive;
+    private float pagesTop;
+    private String fgPkg = "";
     private float progress;
     private ValueAnimator anim;
     private long openedAt;
@@ -215,7 +217,10 @@ final class Panel implements PanelRoot.Host {
         accent = Prefs.accent(sp);
         TileView.HAPTICS = sp.getBoolean(Prefs.HAPTICS, true);
         TileView.ROUNDNESS = sp.getInt(Prefs.ROUND, 100) / 100f;
-        TileView.IDLE_BG = sp.getBoolean(Prefs.GLASS, true) ? 0x24FFFFFF : 0xA6161618;
+        boolean glassOn = sp.getBoolean(Prefs.GLASS, true);
+        Glass.LIQUID = glassOn && sp.getBoolean(Prefs.LIQUID, true);
+        Glass.DENSITY = density;
+        TileView.IDLE_BG = !glassOn ? 0xA6161618 : Glass.LIQUID ? 0x2EFFFFFF : 0x24FFFFFF;
         maxBlur = Math.round(sp.getInt(Prefs.BLUR, 60) / 100f * dp(40));
         dimAlpha = sp.getInt(Prefs.DIM, 45) / 100f;
         tiles.clear();
@@ -245,8 +250,10 @@ final class Panel implements PanelRoot.Host {
         float top = sbH + dp(14);
         float avail = H - top - navH - dp(60);
         geometry(width);
-        float total = hh + g * 0.7f + placeFull(null, 0);
+        boolean conn = sp.getBoolean(Prefs.SEC_CONN, true);
+        float total = hh + g * 0.7f + (conn ? 2 * u + 2 * g : 0) + placeFull(null, 0);
         if (total > avail) geometry(width * avail / total);
+        conn = sp.getBoolean(Prefs.SEC_CONN, true);
 
         root = new PanelRoot(s, this);
         dim = new View(s);
@@ -260,6 +267,12 @@ final class Panel implements PanelRoot.Host {
 
         buildHeader(top);
         float y0 = top + hh + g * 0.7f;
+        // The first two rows stay put; only what's below them swipes.
+        if (conn) {
+            connBlock(stage, y0, 1);
+            y0 += 2 * u + 2 * g;
+        }
+        pagesTop = y0;
 
         pageFull = newPage();
         placeFull(pageFull, y0);
@@ -337,12 +350,7 @@ final class Panel implements PanelRoot.Host {
     /** Full control centre. With parent == null it only measures and returns the height. */
     private float placeFull(FrameLayout p, float y) {
         float start = y;
-        int row = 1;
-        if (sp.getBoolean(Prefs.SEC_CONN, true)) {
-            if (p != null) connBlock(p, y, row);
-            y += 2 * u + 2 * g;
-            row += 2;
-        }
+        int row = 3;
         if (sp.getBoolean(Prefs.SEC_MEDIA, true)) {
             float mh = 2 * u + g;
             if (p != null) {
@@ -394,6 +402,7 @@ final class Panel implements PanelRoot.Host {
     }
 
     private void connBlock(FrameLayout p, float y, int row) {
+        // p may be the stage (fixed rows) or a page
         add(p, wideTile("wifi"), 0, y, 2 * u + g, u, row);
         add(p, wideTile("bt"), 0, y + u + g, 2 * u + g, u, row + 1);
         for (int i = 0; i < 4; i++) {
@@ -406,9 +415,6 @@ final class Panel implements PanelRoot.Host {
 
     /** Compact page: the two top rows, a one-row music player (when something's playing) and notifications. */
     private void placeCompact(FrameLayout p, float y, float bottom) {
-        connBlock(p, y, 1);
-        y += 2 * u + 2 * g;
-
         LinearLayout col = new LinearLayout(s);
         col.setOrientation(LinearLayout.VERTICAL);
         col.setClipChildren(false);
@@ -581,7 +587,8 @@ final class Panel implements PanelRoot.Host {
         if (!attached) {
             // Notifications waiting → compact page; nothing to show → straight to the full centre.
             int count = pagesEnabled && notifList != null ? countNotifs() : 0;
-            setPage(pagesEnabled && count > 0 ? 0 : 1);
+            pagingActive = pagesEnabled && count > 0;
+            setPage(pagingActive ? 0 : 1);
             setProgress(0);
             try {
                 wm.addView(root, lp);
@@ -688,13 +695,39 @@ final class Panel implements PanelRoot.Host {
     private FrameLayout other() { return page == 0 ? pageFull : pageCompact; }
 
     private void setPage(int p) {
-        if (!pagesEnabled || pageCompact == null) { page = 1; pageFull.setTranslationX(0); return; }
+        showDots(pagingActive);
+        if (!pagesEnabled || pageCompact == null || !pagingActive) {
+            page = 1;
+            pageFull.animate().cancel();
+            pageFull.setTranslationX(0);
+            if (pageCompact != null) { pageCompact.animate().cancel(); pageCompact.setTranslationX(W); }
+            return;
+        }
         page = p;
         cur().animate().cancel();
         other().animate().cancel();
         cur().setTranslationX(0);
         other().setTranslationX(W);
         dots(0);
+    }
+
+    private void showDots(boolean v) {
+        if (dot0 == null) return;
+        dot0.setVisibility(v ? View.VISIBLE : View.GONE);
+        dot1.setVisibility(v ? View.VISIBLE : View.GONE);
+    }
+
+    /** No notifications left: slide to the full centre and stop paging. */
+    private void dropPaging() {
+        pagingActive = false;
+        showDots(false);
+        if (page == 0 && pageCompact != null) {
+            DecelerateInterpolator di = new DecelerateInterpolator(1.6f);
+            pageCompact.animate().translationX(-W).setDuration(280).setInterpolator(di).start();
+            pageFull.setTranslationX(W);
+            pageFull.animate().translationX(0).setDuration(280).setInterpolator(di).start();
+        }
+        page = 1;
     }
 
     /** f = how far we are towards the other page (0..1). */
@@ -707,7 +740,7 @@ final class Panel implements PanelRoot.Host {
 
     @Override
     public boolean canPage(float rawX, float rawY) {
-        if (!pagesEnabled || pageCompact == null) return false;
+        if (!pagingActive || pageCompact == null || rawY < pagesTop) return false;
         if (page == 0 && notifList != null) {
             // Cards use sideways swipes to dismiss; everywhere else switches page.
             for (int i = 0; i < notifList.getChildCount(); i++) {
@@ -795,14 +828,26 @@ final class Panel implements PanelRoot.Host {
     public void onBack() { close(); }
 
     void onWindowEvent(AccessibilityEvent e) {
-        if (!attached || progress < 0.5f) return;
         if (e.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return;
-        if (SystemClock.uptimeMillis() - openedAt < 700) return;
-        CharSequence pkg = e.getPackageName();
-        if (pkg == null) return;
-        String p = pkg.toString();
-        if (p.equals(s.getPackageName()) || p.equals("com.android.systemui")) return;
+        CharSequence pk = e.getPackageName();
+        if (pk == null) return;
+        String p = pk.toString();
+        if (p.equals(s.getPackageName()) || p.equals("com.android.systemui") || p.equals(imePkg())) return;
+        CharSequence cls = e.getClassName();
+        if (cls != null && cls.toString().startsWith("android.inputmethodservice")) return;
+        if (!attached) { fgPkg = p; return; }
+        // Apps fire these events all the time (menus, dialogs, keyboards); only close when the
+        // foreground app really changes — e.g. you went home or switched apps.
+        if (p.equals(fgPkg) || progress < 0.5f || SystemClock.uptimeMillis() - openedAt < 700) return;
+        fgPkg = p;
         close();
+    }
+
+    private String imePkg() {
+        String ime = Settings.Secure.getString(s.getContentResolver(), Settings.Secure.DEFAULT_INPUT_METHOD);
+        if (ime == null) return "";
+        int i = ime.indexOf('/');
+        return i > 0 ? ime.substring(0, i) : ime;
     }
 
     // ================================================================== live state
@@ -1480,6 +1525,15 @@ final class Panel implements PanelRoot.Host {
         List<StatusBarNotification> list = notifs();
         StringBuilder sig = new StringBuilder();
         for (StatusBarNotification sbn : list) sig.append(sbn.getKey()).append(sbn.getPostTime()).append('|');
+        if (attached && pagesEnabled) {
+            if (list.isEmpty() && pagingActive) dropPaging();
+            else if (!list.isEmpty() && !pagingActive) {
+                pagingActive = true;
+                if (pageCompact != null) pageCompact.setTranslationX(W);
+                showDots(true);
+                dots(0);
+            }
+        }
         String ns = sig.toString();
         if (ns.equals(notifSig) && notifList.getChildCount() > 0) return;
         notifSig = ns;

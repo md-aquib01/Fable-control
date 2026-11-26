@@ -49,6 +49,8 @@ public class SettingsActivity extends Activity {
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         sp = Prefs.get(this);
+        // Opening the app starts Fable Control again after an Exit.
+        if (sp.getBoolean(Prefs.PAUSED, false)) sp.edit().putBoolean(Prefs.PAUSED, false).apply();
         getWindow().setStatusBarColor(BG);
         getWindow().setNavigationBarColor(BG);
         scroll = new ScrollView(this);
@@ -87,6 +89,7 @@ public class SettingsActivity extends Activity {
         sectionsCard();
         tilesCard();
         tipsCard();
+        exitCard();
 
         scroll.post(() -> scroll.scrollTo(0, y));
     }
@@ -213,6 +216,7 @@ public class SettingsActivity extends Activity {
         }
         c.addView(sw);
         toggle(c, "Glass buttons", "See-through white buttons instead of dark ones", Prefs.GLASS, true);
+        toggle(c, "Liquid glass", "Light catches the rims and a soft sheen sits on top of each glass button", Prefs.LIQUID, true);
         seek(c, "Background blur", Prefs.BLUR, 0, 100, 60, "%");
         seek(c, "Background darkness", Prefs.DIM, 0, 90, 45, "%");
         seek(c, "Panel size", Prefs.SCALE, 80, 115, 100, "%");
@@ -316,6 +320,24 @@ public class SettingsActivity extends Activity {
         }
         View pad = new View(this);
         c.addView(pad, new LinearLayout.LayoutParams(1, dp(8)));
+    }
+
+    private void exitCard() {
+        LinearLayout c = card("Exit");
+        TextView t = text("Exit Fable Control", 16, 0xFFFF453A, true);
+        LinearLayout r = new LinearLayout(this);
+        r.setOrientation(LinearLayout.VERTICAL);
+        r.setPadding(dp(16), dp(14), dp(16), dp(14));
+        r.addView(t);
+        TextView sub = text("Stops the panel and the swipe strip right away. It stays off until you open this app again.", 13, SUB, false);
+        sub.setPadding(0, dp(4), 0, 0);
+        r.addView(sub);
+        r.setBackground(new RippleDrawable(ColorStateList.valueOf(0x22FFFFFF), null, null));
+        r.setOnClickListener(v -> {
+            sp.edit().putBoolean(Prefs.PAUSED, true).commit();
+            finishAndRemoveTask();
+        });
+        c.addView(r);
     }
 
     // ---------------------------------------------------------------- tile order

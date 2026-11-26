@@ -34,6 +34,8 @@ final class MediaView extends View {
     private final TextPaint tp = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final TextPaint ap = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final Path clip = new Path();
+    private final Glass glass = new Glass();
+    private float clipR;
     private final Path artClip = new Path();
     private final RectF artR = new RectF();
     private final Rect src = new Rect();
@@ -71,6 +73,7 @@ final class MediaView extends View {
         clip.reset();
         float r = wide() ? h * 0.5f * TileView.ROUNDNESS * 0.72f
                 : Math.min(w, h) * 0.2f * TileView.ROUNDNESS + w * 0.04f;
+        clipR = r;
         clip.addRoundRect(0, 0, w, h, r, r, Path.Direction.CW);
         float pad = w * 0.1f, a = w * 0.36f;
         if (wide()) { pad = h * 0.16f; a = h - 2 * pad; }
@@ -98,11 +101,7 @@ final class MediaView extends View {
     @Override
     protected void onDraw(Canvas c) {
         int w = getWidth(), h = getHeight();
-        c.save();
-        c.clipPath(clip);
-        bg.setColor(TileView.IDLE_BG);
-        c.drawRect(0, 0, w, h, bg);
-        c.restore();
+        glass.rect(c, 0, 0, w, h, clipR, TileView.IDLE_BG);
 
         // artwork
         if (art != null && !art.isRecycled()) {
