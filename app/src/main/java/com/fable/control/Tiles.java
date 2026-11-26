@@ -5,7 +5,7 @@ final class Tiles {
     static final String[] ALL = {
             "cell", "air", "hotspot", "location",
             "flash", "dark", "calc", "rotate", "qr", "battery", "shot", "camera",
-            "ringer", "awake", "nfc", "datasaver", "timer", "music", "lock", "power", "split", "notif", "settings"
+            "ringer", "awake", "nfc", "datasaver", "timer", "music", "lock", "power", "split", "notif", "settings", "off"
     };
 
     static String label(String id) {
@@ -33,6 +33,7 @@ final class Tiles {
             case "split": return "Split screen";
             case "notif": return "Notifications";
             case "settings": return "Settings";
+            case "off": return "Turn off (for payments)";
         }
         return id;
     }
@@ -62,6 +63,7 @@ final class Tiles {
             case "split": return R.drawable.ic_split;
             case "notif": return R.drawable.ic_notif;
             case "settings": return R.drawable.ic_gear;
+            case "off": return R.drawable.ic_pause;
         }
         return R.drawable.ic_gear;
     }

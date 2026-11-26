@@ -1196,6 +1196,10 @@ final class Panel implements PanelRoot.Host {
             case "split": global(AccessibilityService.GLOBAL_ACTION_TOGGLE_SPLIT_SCREEN, 260); return;
             case "notif": global(AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS, 220); return;
             case "settings": launch(new Intent(Settings.ACTION_SETTINGS)); return;
+            case "off":
+                showHint("Fable Control off. Hold both volume keys to turn it back on");
+                h.postDelayed(() -> { closeNow(); s.disableSelf(); }, 1100);
+                return;
         }
     }
 

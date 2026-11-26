@@ -140,6 +140,8 @@ public class SettingsActivity extends Activity {
                 () -> start(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)));
         permRow(c, "Do Not Disturb access", "Focus tile and silent mode", dnd,
                 () -> start(new Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)));
+        row(c, "Quick on/off shortcut", "Lets you switch Fable Control off before paying and on again after. Open it, turn on \"Fable Control shortcut\" and pick \"Hold volume keys\".",
+                null, this::openA11yDetails);
         row(c, "Says \"Restricted setting\"?", "Open App info → ⋮ menu → Allow restricted settings, then try again",
                 null, () -> start(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName()))));
 
@@ -453,12 +455,12 @@ public class SettingsActivity extends Activity {
         r.setOrientation(LinearLayout.VERTICAL);
         r.setPadding(dp(16), dp(14), dp(16), dp(14));
         r.addView(t);
-        TextView sub = text("Stops the panel and the swipe strip right away. It stays off until you open this app again.", 13, SUB, false);
+        TextView sub = text("Fully turns Fable Control off, so payment and banking apps work. To turn it back on: hold both volume keys for 3 seconds (after setting up the shortcut below), or tap \"Turn on Fable Control\" in Setup.", 13, SUB, false);
         sub.setPadding(0, dp(4), 0, 0);
         r.addView(sub);
         r.setBackground(new RippleDrawable(ColorStateList.valueOf(0x22FFFFFF), null, null));
         r.setOnClickListener(v -> {
-            sp.edit().putBoolean(Prefs.PAUSED, true).commit();
+            if (CCService.instance != null) CCService.instance.disableSelf();
             finishAndRemoveTask();
         });
         c.addView(r);
@@ -492,6 +494,15 @@ public class SettingsActivity extends Activity {
     }
 
     // ---------------------------------------------------------------- permission checks
+
+    private void openA11yDetails() {
+        try {
+            startActivity(new Intent("android.settings.ACCESSIBILITY_DETAILS_SETTINGS")
+                    .putExtra(Intent.EXTRA_COMPONENT_NAME, new ComponentName(this, CCService.class).flattenToString()));
+        } catch (Exception e) {
+            start(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+        }
+    }
 
     private boolean isA11yOn() {
         String v = Settings.Secure.getString(getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
