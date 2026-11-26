@@ -42,6 +42,30 @@ public class SettingsActivity extends Activity {
     private LinearLayout list;
     private ScrollView scroll;
     private int accent;
+    private TextView memView;
+    private final android.os.Handler ui = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable memTick = this::updateMem;
+
+    /** Memory used by Fable Control's process right now (PSS, the same figure Android's memory screen uses). */
+    private void updateMem() {
+        if (memView == null) return;
+        try {
+            android.app.ActivityManager am = getSystemService(android.app.ActivityManager.class);
+            android.os.Debug.MemoryInfo[] mi = am.getProcessMemoryInfo(new int[]{android.os.Process.myPid()});
+            int mb = Math.round(mi[0].getTotalPss() / 1024f);
+            memView.setText("Memory in use: " + mb + " MB  ·  includes this settings screen, which frees up when you leave it");
+        } catch (Exception e) {
+            memView.setText("");
+        }
+        ui.removeCallbacks(memTick);
+        ui.postDelayed(memTick, 2000);
+    }
+
+    @Override
+    protected void onPause() {
+        ui.removeCallbacks(memTick);
+        super.onPause();
+    }
     private List<AppTiles.T> appTiles;
     private int dp(float v) { return Math.round(v * getResources().getDisplayMetrics().density); }
 
@@ -81,6 +105,10 @@ public class SettingsActivity extends Activity {
         TextView tag = text("A control center that feels like it belongs.", 14, SUB, false);
         tag.setPadding(dp(4), 0, 0, dp(14));
         list.addView(tag);
+        memView = text("", 13, SUB, false);
+        memView.setPadding(dp(4), 0, 0, dp(10));
+        list.addView(memView);
+        updateMem();
 
         setupCard();
         layoutCard();
