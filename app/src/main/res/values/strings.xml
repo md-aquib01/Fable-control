@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Fable Control</string>
-    <string name="a11y_desc">Opens the Fable Control panel when you swipe down from the corner you choose. It only looks at your phone\'s own Quick Settings panel, to press the tile you tapped (Android doesn\'t let apps switch things like mobile data directly). It does not read or store anything from your apps.</string>
-    <string name="widget_desc">Your Fable Control toggles, music and buds on the home screen</string>
+    <string name="app_name">Fable Notes</string>
+    <string name="widget_desc">Paper notes you flick through. Tap a line to strike it off.</string>
 </resources>

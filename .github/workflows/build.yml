@@ -23,15 +23,15 @@ jobs:
       - name: Build release APK
         run: gradle assembleRelease --no-daemon
       - name: Rename APK
-        run: cp app/build/outputs/apk/release/app-release.apk FableControl.apk
+        run: cp app/build/outputs/apk/release/app-release.apk FableNotes.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: FableControl
-          path: FableControl.apk
+          name: FableNotes
+          path: FableNotes.apk
       - name: Publish to Releases
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          name: Fable Control build ${{ github.run_number }}
-          files: FableControl.apk
+          name: Fable Notes build ${{ github.run_number }}
+          files: FableNotes.apk
           make_latest: true
