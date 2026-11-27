@@ -27,6 +27,7 @@ class InkRow extends FrameLayout {
     interface Host {
         void onEnter(InkRow row, String carry);
         void onDeleteEmpty(InkRow row);
+        void onToggled(InkRow row);
     }
 
     final EditText et;
@@ -37,9 +38,11 @@ class InkRow extends FrameLayout {
     private final Paint ink = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path seg = new Path();
     private ValueAnimator anim;
+    private final Host host;
 
     InkRow(Context c, Typeface hand, float sp, String text, boolean isDone, Host host) {
         super(c);
+        this.host = host;
         setWillNotDraw(false);
         int h = Ui.dpi(c, sp * 2.0f);
         setLayoutParams(new LinearLayout.LayoutParams(-1, h));
@@ -127,6 +130,7 @@ class InkRow extends FrameLayout {
         et.animate().alpha(done ? 1f : 1f).setDuration(300).start();
         dash.setAlpha(done ? 1f : 1f);
         Ui.pop(dash);
+        host.onToggled(this);
     }
 
     @Override

@@ -31,6 +31,7 @@ public class EditorActivity extends Activity implements InkRow.Host {
     private boolean deleted;
     private PaperLayout paper;
     private LinearLayout rows, dots;
+    private TextView clear;
     private EditText title;
     private Typeface hand, head;
     private float sp;
@@ -125,8 +126,27 @@ public class EditorActivity extends Activity implements InkRow.Host {
         });
         paper.addView(more, new LinearLayout.LayoutParams(-2, -2));
 
+        clear = new TextView(this);
+        clear.setText("Clear completed");
+        clear.setTypeface(head);
+        clear.setTextSize(13);
+        clear.setTextColor(0xFFFFFFFF);
+        clear.setPadding(dp(16), dp(9), dp(16), dp(9));
+        GradientDrawable cg = new GradientDrawable();
+        cg.setColor(NoteStore.INK);
+        cg.setCornerRadius(dp(20));
+        clear.setBackground(cg);
+        clear.setElevation(dp(2));
+        LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(-2, -2);
+        clp.gravity = Gravity.END;
+        clp.topMargin = dp(10);
+        paper.addView(clear, clp);
+        Ui.squish(clear);
+        clear.setOnClickListener(v -> clearCompleted());
+
         setContentView(root);
         refreshDots();
+        refreshClear(false);
 
         // paper drops in with a little wobble
         paper.setAlpha(0f);
@@ -195,6 +215,66 @@ public class EditorActivity extends Activity implements InkRow.Host {
                 .withEndAction(() -> rows.removeView(row)).start();
     }
 
+    @Override
+    public void onToggled(InkRow row) { refreshClear(true); }
+
+    private boolean anyDone() {
+        for (int i = 0; i < rows.getChildCount(); i++) {
+            InkRow r = (InkRow) rows.getChildAt(i);
+            if (r.done && r.getAlpha() > 0f) return true;
+        }
+        return false;
+    }
+
+    private void refreshClear(boolean animate) {
+        boolean show = anyDone();
+        if (show == (clear.getVisibility() == View.VISIBLE)) return;
+        if (show) {
+            clear.setVisibility(View.VISIBLE);
+            if (animate) {
+                clear.setAlpha(0f);
+                clear.setScaleX(0.6f);
+                clear.setScaleY(0.6f);
+                clear.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(380).setInterpolator(Ui.SPRING).start();
+            }
+        } else if (animate) {
+            clear.animate().alpha(0f).scaleX(0.6f).scaleY(0.6f).setDuration(180)
+                    .withEndAction(() -> { clear.setVisibility(View.GONE); clear.setAlpha(1f); clear.setScaleX(1f); clear.setScaleY(1f); })
+                    .start();
+        } else {
+            clear.setVisibility(View.GONE);
+        }
+    }
+
+    /** Sweeps struck-off lines away, one after another. */
+    private void clearCompleted() {
+        clear.performHapticFeedback(HapticFeedbackConstants.CONFIRM);
+        List<InkRow> gone = new ArrayList<>();
+        for (int i = 0; i < rows.getChildCount(); i++) {
+            InkRow r = (InkRow) rows.getChildAt(i);
+            if (r.done) gone.add(r);
+        }
+        if (gone.isEmpty()) return;
+        boolean allGone = gone.size() == rows.getChildCount();
+        int k = 0;
+        for (InkRow r : gone) {
+            r.setAlpha(0.999f);
+            r.animate().alpha(0f).translationX(dp(60)).rotation(4f).setStartDelay(k++ * 60L).setDuration(240)
+                    .withEndAction(() -> {
+                        rows.removeView(r);
+                        if (rows.getChildCount() == 0) addRow(0, "", false, true);
+                    }).start();
+        }
+        if (allGone) note.items.clear();
+        refreshClearAfter(k * 60L + 260);
+    }
+
+    private void refreshClearAfter(long delay) {
+        clear.animate().alpha(0f).scaleX(0.6f).scaleY(0.6f).setStartDelay(0).setDuration(180)
+                .withEndAction(() -> { clear.setVisibility(View.GONE); clear.setAlpha(1f); clear.setScaleX(1f); clear.setScaleY(1f); })
+                .start();
+    }
+
     private void pickColor(int c, View dot) {
         dot.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK);
         if (note.color == c) return;
@@ -245,7 +325,8 @@ public class EditorActivity extends Activity implements InkRow.Host {
         List<NoteStore.Item> items = new ArrayList<>();
         for (int i = 0; i < rows.getChildCount(); i++) {
             InkRow r = (InkRow) rows.getChildAt(i);
-            if (r.getAlpha() == 0f) continue; // being removed
+            if (r.getAlpha() < 1f && r.done) continue;  // being cleared
+            if (r.getAlpha() == 0f) continue;           // being removed
             String t = r.et.getText().toString().trim();
             if (!t.isEmpty()) items.add(new NoteStore.Item(t, r.done));
         }
