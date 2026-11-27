@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent">
-    <FrameLayout android:layout_width="180dp" android:layout_height="180dp" android:layout_gravity="center" android:background="@drawable/w_base">
-        <FrameLayout android:layout_width="157dp" android:layout_height="157dp" android:layout_gravity="center"
-            android:rotation="-1" android:background="@drawable/paper_back"/>
-        <FrameLayout android:layout_width="155dp" android:layout_height="155dp" android:layout_gravity="center"
+    <FrameLayout android:layout_width="180dp" android:layout_height="180dp" android:layout_gravity="center">
+        <FrameLayout android:layout_width="167dp" android:layout_height="167dp" android:layout_gravity="center"
+            android:rotation="-1" android:background="@drawable/paper_sky"/>
+        <FrameLayout android:layout_width="165dp" android:layout_height="165dp" android:layout_gravity="center"
             android:rotation="-7.4" android:background="@drawable/paper_cream" android:padding="6dp">
             <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical">
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="SHOPPING LIST"

@@ -30,8 +30,6 @@ public class NotesWidget extends AppWidgetProvider {
         RemoteViews rv = new RemoteViews(c.getPackageName(), R.layout.widget_root);
         Geometry g = Geometry.of(c, wid);
         int dip = TypedValue.COMPLEX_UNIT_DIP;
-        rv.setViewLayoutWidth(R.id.base, g.side, dip);
-        rv.setViewLayoutHeight(R.id.base, g.side, dip);
         rv.setViewLayoutWidth(R.id.back, g.backView, dip);
         rv.setViewLayoutHeight(R.id.back, g.backView, dip);
         rv.setViewLayoutWidth(R.id.flip, g.frontView, dip);
@@ -51,10 +49,24 @@ public class NotesWidget extends AppWidgetProvider {
         rv.setPendingIntentTemplate(R.id.flip, PendingIntent.getBroadcast(c, wid, tpl,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE));
 
+        showIndex(c, wid, rv, NoteStore.index(c, wid));
+
         Intent app = new Intent(c, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         rv.setOnClickPendingIntent(R.id.empty, PendingIntent.getActivity(c, 7, app,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
         return rv;
+    }
+
+    /** Shows note i (wrapped) and paints the back page in the following note's colour. */
+    static int showIndex(Context c, int wid, RemoteViews rv, int i) {
+        java.util.List<NoteStore.Note> notes = NoteStore.all(c);
+        int n = notes.size();
+        if (n == 0) return 0;
+        i = ((i % n) + n) % n;
+        rv.setDisplayedChild(R.id.flip, i);
+        int backColor = n > 1 ? notes.get((i + 1) % n).color : (notes.get(i).color + 3) % NoteStore.PAPER_RES.length;
+        rv.setInt(R.id.back, "setBackgroundResource", NoteStore.PAPER_RES[backColor]);
+        return i;
     }
 
     @Override
@@ -68,7 +80,8 @@ public class NotesWidget extends AppWidgetProvider {
         if ("next".equals(op)) {
             if (wid == AppWidgetManager.INVALID_APPWIDGET_ID) return;
             RemoteViews rv = new RemoteViews(c.getPackageName(), R.layout.widget_root);
-            rv.showNext(R.id.flip);
+            int i = showIndex(c, wid, rv, NoteStore.index(c, wid) + 1);
+            NoteStore.setIndex(c, wid, i);
             m.partiallyUpdateAppWidget(wid, rv);
         } else if ("toggle".equals(op)) {
             boolean checked = in.getBooleanExtra(RemoteViews.EXTRA_CHECKED, false);

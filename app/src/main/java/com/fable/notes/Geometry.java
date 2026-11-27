@@ -6,8 +6,8 @@ import android.os.Bundle;
 
 /** Proportions measured from the reference image (all in dp, scaled to the widget size). */
 final class Geometry {
-    static final float FRONT = 0.80f;   // front paper side / yellow square side
-    static final float BACK = 0.81f;    // back paper side / yellow square side
+    static final float FRONT = 0.86f;   // front paper side / widget square side
+    static final float BACK = 0.87f;    // back paper side / widget square side
     static final float VIEW = 1.08f;    // paper drawables carry a 4% shadow margin on each side
     static final float ROW = 0.105f;    // line height / paper side (reference is 0.17: we fit more lines)
 
@@ -25,7 +25,7 @@ final class Geometry {
             if (maxH > 40) h = maxH;   // portrait: height = max height
         }
         Geometry g = new Geometry();
-        g.side = Math.max(100, Math.min(w, h) - 6);
+        g.side = Math.max(100, Math.min(w, h) - 4);
         g.paper = g.side * FRONT;
         g.back = g.side * BACK;
         g.frontView = g.paper * VIEW;

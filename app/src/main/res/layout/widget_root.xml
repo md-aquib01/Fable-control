@@ -1,15 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/root" android:layout_width="match_parent" android:layout_height="match_parent"
     android:clipChildren="false">
-    <FrameLayout android:id="@+id/base" android:layout_width="240dp" android:layout_height="240dp" android:layout_gravity="center"
-        android:background="@drawable/w_base" android:clipChildren="false">
-        <FrameLayout android:id="@+id/back" android:layout_width="210dp" android:layout_height="210dp" android:layout_gravity="center"
-            android:rotation="-1" android:background="@drawable/paper_back"/>
-        <AdapterViewFlipper android:id="@+id/flip" android:layout_width="207dp" android:layout_height="207dp"
-            android:layout_gravity="center" android:rotation="-7.4" android:loopViews="true"
-            android:inAnimation="@animator/note_in" android:outAnimation="@animator/note_out"/>
-        <TextView android:id="@+id/empty" android:layout_width="207dp" android:layout_height="207dp" android:layout_gravity="center"
-            android:rotation="-7.4" android:background="@drawable/paper_cream" android:gravity="center" android:padding="24dp"
-            android:textSize="15sp" android:textColor="#3B5BD6" android:text="Open Fable Notes to write a note"/>
-    </FrameLayout>
+    <FrameLayout android:id="@+id/back" android:layout_width="210dp" android:layout_height="210dp" android:layout_gravity="center"
+        android:rotation="-1" android:background="@drawable/paper_cream"/>
+    <AdapterViewFlipper android:id="@+id/flip" android:layout_width="207dp" android:layout_height="207dp"
+        android:layout_gravity="center" android:rotation="-7.4" android:loopViews="true"
+        android:inAnimation="@animator/note_in" android:outAnimation="@animator/note_out"/>
+    <TextView android:id="@+id/empty" android:layout_width="207dp" android:layout_height="207dp" android:layout_gravity="center"
+        android:rotation="-7.4" android:background="@drawable/paper_cream" android:gravity="center" android:padding="24dp"
+        android:textSize="15sp" android:textColor="#3B5BD6" android:text="Open Fable Notes to write a note"/>
 </FrameLayout>

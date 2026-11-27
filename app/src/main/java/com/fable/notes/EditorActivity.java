@@ -51,7 +51,7 @@ public class EditorActivity extends Activity implements InkRow.Host {
         if (fresh) {
             note = new NoteStore.Note();
             note.id = System.currentTimeMillis();
-            note.color = (int) ((note.id / 1000) % NoteStore.PAPER_RES.length);
+            note.color = NoteStore.nextColor(this);
         }
 
         LinearLayout root = new LinearLayout(this);

@@ -38,8 +38,6 @@ class NoteTile extends View {
         float S = Math.min(getWidth(), getHeight()) - Ui.dp(getContext(), 8);
         float ox = (getWidth() - S) / 2f, oy = (getHeight() - S) / 2f;
         float cx = ox + S / 2f, cy = oy + S / 2f;
-        r.set(ox, oy, ox + S, oy + S);
-        Ui.drawBase(cv, r, p);
 
         float lift = S * 0.012f;
         // back paper
@@ -47,7 +45,8 @@ class NoteTile extends View {
         cv.save();
         cv.rotate(-1f, cx, cy);
         r.set(cx - b / 2, cy - b / 2, cx + b / 2, cy + b / 2);
-        Ui.drawPaper(cv, r, b * 0.046f, 0xFFF3EBDB, 0xFFEFE6D4, 0xFFD8CDB6, lift, p);
+        int bc = ((note == null ? 0 : note.color) + 1) % NoteStore.PAPER_RES.length;
+        Ui.drawPaper(cv, r, b * 0.046f, NoteStore.PAPER_TOP[bc], NoteStore.PAPER_BOTTOM[bc], NoteStore.PAPER_RIM[bc], lift, p);
         cv.restore();
 
         // front paper

@@ -16,13 +16,13 @@ import java.util.List;
 public final class NoteStore {
     private NoteStore() {}
 
-    public static final String[] PAPER_NAMES = {"Cream", "Mint", "Blush", "Sky", "Lilac"};
+    public static final String[] PAPER_NAMES = {"Cream", "Mint", "Blush", "Sky", "Lilac", "Lemon"};
     public static final int[] PAPER_RES = {R.drawable.paper_cream, R.drawable.paper_mint,
-            R.drawable.paper_blush, R.drawable.paper_sky, R.drawable.paper_lilac};
-    public static final int[] PAPER_TOP = {0xFFF7F0E1, 0xFFEFF7EF, 0xFFFBEFEB, 0xFFEEF3FA, 0xFFF3EFF9};
-    public static final int[] PAPER_BOTTOM = {0xFFF3EAD8, 0xFFE6F1E7, 0xFFF7E6E1, 0xFFE5ECF6, 0xFFECE6F5};
-    public static final int[] PAPER_RIM = {0xFFDCD1BC, 0xFFC6D8C8, 0xFFE2CBC3, 0xFFC5D1E2, 0xFFD2C9E2};
-    public static final int[] TITLE = {0xFFC2B68A, 0xFF97B39E, 0xFFC9A59D, 0xFF9DAFC9, 0xFFAFA3C6};
+            R.drawable.paper_blush, R.drawable.paper_sky, R.drawable.paper_lilac, R.drawable.paper_lemon};
+    public static final int[] PAPER_TOP = {0xFFF7F0E1, 0xFFE6F4E4, 0xFFFBE5E1, 0xFFE1ECFA, 0xFFECE5F8, 0xFFFAF1CC};
+    public static final int[] PAPER_BOTTOM = {0xFFF3EAD8, 0xFFDCEED9, 0xFFF6DAD5, 0xFFD6E4F6, 0xFFE3DAF3, 0xFFF5E9BA};
+    public static final int[] PAPER_RIM = {0xFFDCD1BC, 0xFFBCD5B8, 0xFFE0BDB6, 0xFFB6C8E2, 0xFFC9BCE2, 0xFFDDCF9C};
+    public static final int[] TITLE = {0xFFC2B68A, 0xFF8DB088, 0xFFC99A92, 0xFF8EA6C9, 0xFFA596C6, 0xFFBFAE6E};
     public static final int INK = 0xFF3B5BD6;
     public static final int INK_DARK = 0xFF3B5BD6;
 
@@ -91,9 +91,8 @@ public final class NoteStore {
         l.add(a);
         Note b = new Note();
         b.id = 2; b.title = "Today"; b.color = 3;
-        b.items.add(new Item("Flick me up or down", false));
         b.items.add(new Item("Tap a line to strike it", true));
-        b.items.add(new Item("Tap the title to edit", false));
+        b.items.add(new Item("Tap the top for the next note", false));
         b.items.add(new Item("New notes: open the app", false));
         l.add(b);
         return l;
@@ -181,6 +180,19 @@ public final class NoteStore {
     public static void refreshWidgets(Context c) {
         AppWidgetManager m = AppWidgetManager.getInstance(c);
         int[] ids = m.getAppWidgetIds(new ComponentName(c, NotesWidget.class));
-        if (ids != null && ids.length > 0) m.notifyAppWidgetViewDataChanged(ids, R.id.flip);
+        if (ids == null) return;
+        for (int id : ids) m.updateAppWidget(id, NotesWidget.build(c, id));
+        if (ids.length > 0) m.notifyAppWidgetViewDataChanged(ids, R.id.flip);
+    }
+
+    /** Which note a widget is showing. */
+    public static int index(Context c, int wid) { return sp(c).getInt("idx_" + wid, 0); }
+    public static void setIndex(Context c, int wid, int i) { sp(c).edit().putInt("idx_" + wid, i).apply(); }
+
+    /** A colour different from the newest note's, so neighbouring notes never match. */
+    public static int nextColor(Context c) {
+        List<Note> l = all(c);
+        if (l.isEmpty()) return 0;
+        return (l.get(0).color + 1) % PAPER_RES.length;
     }
 }

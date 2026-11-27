@@ -84,19 +84,20 @@ public class NotesWidgetService extends RemoteViewsService {
 
             rv.setInt(R.id.card, "setBackgroundResource", NoteStore.PAPER_RES[n.color]);
             int m = Math.round(g.margin * d);
-            rv.setViewPadding(R.id.content, m, m + Math.round(g.titleTop * d), m, m);
+            rv.setViewPadding(R.id.content, m, m, m, m);
+            rv.setViewLayoutHeight(R.id.head, g.titleTop + g.titleH + g.titleGap, dip);
 
             String title = n.title == null || n.title.trim().isEmpty() ? "NOTE" : n.title.trim().toUpperCase();
             float textW = g.paper - g.indent - g.paper * 0.07f;
             Line tl = renderColor(title, NoteStore.title(c), g.titleSize, 0.04f, textW, g.titleH, d, dpi,
                     NoteStore.TITLE[n.color]);
             rv.setImageViewBitmap(R.id.title, tl.bmp);
-            rv.setViewPadding(R.id.title, Math.round(g.indent * d), 0, 0, 0);
-            rv.setViewLayoutMargin(R.id.title, RemoteViews.MARGIN_BOTTOM, g.titleGap, dip);
+            rv.setViewPadding(R.id.title, Math.round(g.indent * d), 0, 0, Math.round(g.titleGap * d));
 
             Intent open = new Intent().putExtra("op", "open").putExtra("id", n.id);
             Intent next = new Intent().putExtra("op", "next");
             rv.setOnClickFillInIntent(R.id.card, open);
+            rv.setOnClickFillInIntent(R.id.head, next);
             rv.setOnClickFillInIntent(R.id.title, next);
 
             int fit = g.rows;
