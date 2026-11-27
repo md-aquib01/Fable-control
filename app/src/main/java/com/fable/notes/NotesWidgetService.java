@@ -26,11 +26,14 @@ public class NotesWidgetService extends RemoteViewsService {
     }
 
     static final int[] ROW = {R.id.r0, R.id.r1, R.id.r2, R.id.r3, R.id.r4, R.id.r5, R.id.r6,
-            R.id.r7, R.id.r8, R.id.r9, R.id.r10, R.id.r11, R.id.r12, R.id.r13};
+            R.id.r7, R.id.r8, R.id.r9, R.id.r10, R.id.r11, R.id.r12, R.id.r13,
+            R.id.r14, R.id.r15, R.id.r16, R.id.r17, R.id.r18, R.id.r19};
     static final int[] TXT = {R.id.t0, R.id.t1, R.id.t2, R.id.t3, R.id.t4, R.id.t5, R.id.t6,
-            R.id.t7, R.id.t8, R.id.t9, R.id.t10, R.id.t11, R.id.t12, R.id.t13};
+            R.id.t7, R.id.t8, R.id.t9, R.id.t10, R.id.t11, R.id.t12, R.id.t13,
+            R.id.t14, R.id.t15, R.id.t16, R.id.t17, R.id.t18, R.id.t19};
     static final int[] CHK = {R.id.c0, R.id.c1, R.id.c2, R.id.c3, R.id.c4, R.id.c5, R.id.c6,
-            R.id.c7, R.id.c8, R.id.c9, R.id.c10, R.id.c11, R.id.c12, R.id.c13};
+            R.id.c7, R.id.c8, R.id.c9, R.id.c10, R.id.c11, R.id.c12, R.id.c13,
+            R.id.c14, R.id.c15, R.id.c16, R.id.c17, R.id.c18, R.id.c19};
 
 
     static class Factory implements RemoteViewsFactory {
@@ -83,12 +86,13 @@ public class NotesWidgetService extends RemoteViewsService {
             int dip = TypedValue.COMPLEX_UNIT_DIP;
 
             rv.setInt(R.id.card, "setBackgroundResource", NoteStore.PAPER_RES[n.color]);
+            rv.setViewPadding(R.id.card, 0, 0, 0, 0); // layer-list insets would otherwise pad the card
             int m = Math.round(g.margin * d);
             rv.setViewPadding(R.id.content, m, m, m, m);
             rv.setViewLayoutHeight(R.id.head, g.titleTop + g.titleH + g.titleGap, dip);
 
             String title = n.title == null || n.title.trim().isEmpty() ? "NOTE" : n.title.trim().toUpperCase();
-            float textW = g.paper - g.indent - g.paper * 0.07f;
+            float textW = g.paperW - g.indent - 14f;
             Line tl = renderColor(title, NoteStore.title(c), g.titleSize, 0.04f, textW, g.titleH, d, dpi,
                     NoteStore.TITLE[n.color]);
             rv.setImageViewBitmap(R.id.title, tl.bmp);

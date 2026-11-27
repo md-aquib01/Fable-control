@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <path android:pathData="M9.0,7.4 H99.0 A5,5 0 0 1 104.0,12.4 V102.4 A5,5 0 0 1 99.0,107.4 H9.0 A5,5 0 0 1 4.0,102.4 V12.4 A5,5 0 0 1 9.0,7.4 Z" android:fillColor="#3B2A10" android:fillAlpha="0.05"/><path android:pathData="M9.3,6.4 H98.7 A5,5 0 0 1 103.7,11.4 V101.4 A5,5 0 0 1 98.7,106.4 H9.3 A5,5 0 0 1 4.3,101.4 V11.4 A5,5 0 0 1 9.3,6.4 Z" android:fillColor="#3B2A10" android:fillAlpha="0.07"/><path android:pathData="M9.6,5.4 H98.4 A5,5 0 0 1 103.4,10.4 V100.4 A5,5 0 0 1 98.4,105.4 H9.6 A5,5 0 0 1 4.6,100.4 V10.4 A5,5 0 0 1 9.6,5.4 Z" android:fillColor="#3B2A10" android:fillAlpha="0.09"/>
-    <path android:pathData="M8.6,4 H99.4 A4.6,4.6 0 0 1 104,8.6 V100.10000000000001 A4.6,4.6 0 0 1 99.4,104.7 H8.6 A4.6,4.6 0 0 1 4,100.10000000000001 V8.6 A4.6,4.6 0 0 1 8.6,4 Z" android:fillColor="#DCD1BC"/>
-    <path android:pathData="M8.6,4 H99.4 A4.6,4.6 0 0 1 104,8.6 V99.4 A4.6,4.6 0 0 1 99.4,104 H8.6 A4.6,4.6 0 0 1 4,99.4 V8.6 A4.6,4.6 0 0 1 8.6,4 Z"><aapt:attr name="android:fillColor"><gradient android:type="linear" android:startX="54" android:startY="4" android:endX="54" android:endY="104"><item android:offset="0" android:color="#F7F0E1"/><item android:offset="1" android:color="#F3EAD8"/></gradient></aapt:attr></path>
-</vector>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:left="6.6dp" android:right="6.6dp" android:top="9.6dp" android:bottom="2.4dp">
+        <shape><corners android:radius="12dp"/><solid android:color="#0D3B2A10"/></shape></item>
+    <item android:left="6.4dp" android:right="6.4dp" android:top="8.2dp" android:bottom="3.6dp">
+        <shape><corners android:radius="12dp"/><solid android:color="#123B2A10"/></shape></item>
+    <item android:left="6.2dp" android:right="6.2dp" android:top="7.0dp" android:bottom="4.8dp">
+        <shape><corners android:radius="12dp"/><solid android:color="#173B2A10"/></shape></item>
+    <item android:left="6dp" android:right="6dp" android:top="6dp" android:bottom="5.3dp">
+        <shape><corners android:radius="12dp"/><solid android:color="#DCD1BC"/></shape></item>
+    <item android:left="6dp" android:right="6dp" android:top="6dp" android:bottom="6dp">
+        <shape><corners android:radius="12dp"/><gradient android:angle="270" android:startColor="#F7F0E1" android:endColor="#F3EAD8"/></shape></item>
+</layer-list>

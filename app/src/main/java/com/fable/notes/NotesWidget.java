@@ -30,12 +30,12 @@ public class NotesWidget extends AppWidgetProvider {
         RemoteViews rv = new RemoteViews(c.getPackageName(), R.layout.widget_root);
         Geometry g = Geometry.of(c, wid);
         int dip = TypedValue.COMPLEX_UNIT_DIP;
-        rv.setViewLayoutWidth(R.id.back, g.backView, dip);
-        rv.setViewLayoutHeight(R.id.back, g.backView, dip);
-        rv.setViewLayoutWidth(R.id.flip, g.frontView, dip);
-        rv.setViewLayoutHeight(R.id.flip, g.frontView, dip);
-        rv.setViewLayoutWidth(R.id.empty, g.frontView, dip);
-        rv.setViewLayoutHeight(R.id.empty, g.frontView, dip);
+        rv.setViewLayoutWidth(R.id.back, g.backW, dip);
+        rv.setViewLayoutHeight(R.id.back, g.backH, dip);
+        rv.setViewLayoutWidth(R.id.flip, g.viewW, dip);
+        rv.setViewLayoutHeight(R.id.flip, g.viewH, dip);
+        rv.setViewLayoutWidth(R.id.empty, g.viewW, dip);
+        rv.setViewLayoutHeight(R.id.empty, g.viewH, dip);
 
         Intent svc = new Intent(c, NotesWidgetService.class);
         svc.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, wid);
