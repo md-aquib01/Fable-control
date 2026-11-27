@@ -78,6 +78,7 @@ public class MainActivity extends Activity {
 
         check = text("", 12, 0xFFB3261E, null);
         check.setPadding(dp(6), dp(12), dp(6), 0);
+        check.setTextIsSelectable(true);
         check.setVisibility(View.GONE);
         col.addView(check);
 
@@ -96,6 +97,12 @@ public class MainActivity extends Activity {
     private void selfCheck() {
         String err = null;
         try {
+            android.widget.FrameLayout root = new android.widget.FrameLayout(this);
+            NotesWidget.build(getApplicationContext(), android.appwidget.AppWidgetManager.INVALID_APPWIDGET_ID).apply(this, root);
+        } catch (Throwable t) {
+            err = "Widget check (frame): " + t;
+        }
+        if (err == null) try {
             NotesWidgetService.Factory f = new NotesWidgetService.Factory(getApplicationContext(),
                     android.appwidget.AppWidgetManager.INVALID_APPWIDGET_ID);
             f.onCreate();
