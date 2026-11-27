@@ -23,27 +23,33 @@ final class Ui {
     static float dp(Context c, float v) { return v * c.getResources().getDisplayMetrics().density; }
     static int dpi(Context c, float v) { return Math.round(dp(c, v)); }
 
-    /** Polished paper card: drop shadow, darker rim (3D edge), gradient face, glossy highlight. */
+    /** Reference-style paper: soft layered shadow, thin edge, gentle top-to-bottom face. */
     static void drawPaper(Canvas cv, RectF r, float rad, int top, int bottom, int rim, float lift, Paint p) {
         p.reset();
         p.setAntiAlias(true);
         p.setStyle(Paint.Style.FILL);
-        // shadow
-        p.setColor(0x2E3A2600);
-        cv.drawRoundRect(r.left + lift * 0.3f, r.top + lift * 1.4f, r.right - lift * 0.3f, r.bottom + lift * 1.4f, rad, rad, p);
-        // rim (the paper's thickness)
+        float[][] sh = {{1.0f, 0x0D}, {0.7f, 0x12}, {0.4f, 0x17}};
+        for (float[] s : sh) {
+            p.setColor(((int) s[1] << 24) | 0x3B2A10);
+            float dy = lift * s[0] * 2.2f;
+            cv.drawRoundRect(r.left + lift * 0.2f, r.top + dy, r.right - lift * 0.2f, r.bottom + dy, rad, rad, p);
+        }
         p.setColor(rim);
-        cv.drawRoundRect(r.left, r.top + lift * 0.7f, r.right, r.bottom + lift * 0.7f, rad, rad, p);
-        // face
+        cv.drawRoundRect(r.left, r.top, r.right, r.bottom + Math.max(1f, lift * 0.25f), rad, rad, p);
         p.setShader(new LinearGradient(0, r.top, 0, r.bottom, top, bottom, Shader.TileMode.CLAMP));
         cv.drawRoundRect(r, rad, rad, p);
         p.setShader(null);
-        // thin top highlight
-        p.setStyle(Paint.Style.STROKE);
-        p.setStrokeWidth(Math.max(1f, lift * 0.25f));
-        p.setColor(0x99FFFFFF);
+    }
+
+    /** The yellow rounded square from the reference. */
+    static void drawBase(Canvas cv, RectF r, Paint p) {
+        p.reset();
+        p.setAntiAlias(true);
+        p.setShader(new LinearGradient(0, r.top, 0, r.bottom, new int[]{0xFFE8D28B, 0xFFE5CC7C, 0xFFDAC273},
+                new float[]{0f, 0.5f, 1f}, Shader.TileMode.CLAMP));
+        float rad = r.width() * 0.16f;
         cv.drawRoundRect(r, rad, rad, p);
-        p.setStyle(Paint.Style.FILL);
+        p.setShader(null);
     }
 
     /** A gently wobbly hand-drawn line. */

@@ -44,7 +44,7 @@ class InkRow extends FrameLayout {
         int h = Ui.dpi(c, sp * 2.0f);
         setLayoutParams(new LinearLayout.LayoutParams(-1, h));
 
-        rule.setColor(0x477A6030);
+        rule.setColor(0xFFE9E0CB);
         rule.setStrokeWidth(Ui.dp(c, 1));
         ink.setStyle(Paint.Style.STROKE);
         ink.setStrokeCap(Paint.Cap.ROUND);
@@ -72,7 +72,7 @@ class InkRow extends FrameLayout {
         et.setTypeface(hand);
         et.setTextSize(sp);
         et.setTextColor(NoteStore.INK);
-        et.setHintTextColor(0x661A3FB8);
+        et.setHintTextColor(0x663B5BD6);
         et.setIncludeFontPadding(false);
         et.setSingleLine(true);
         et.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
@@ -86,8 +86,8 @@ class InkRow extends FrameLayout {
 
         done = isDone;
         progress = isDone ? 1f : 0f;
-        et.setAlpha(isDone ? 0.45f : 1f);
-        dash.setAlpha(isDone ? 0.45f : 1f);
+        et.setAlpha(isDone ? 1f : 1f);
+        dash.setAlpha(isDone ? 1f : 1f);
 
         dash.setOnClickListener(v -> toggle());
         et.addTextChangedListener(new TextWatcher() {
@@ -124,8 +124,8 @@ class InkRow extends FrameLayout {
         anim.setInterpolator(Ui.SOFT);
         anim.addUpdateListener(a -> { progress = (float) a.getAnimatedValue(); invalidate(); });
         anim.start();
-        et.animate().alpha(done ? 0.45f : 1f).setDuration(300).start();
-        dash.setAlpha(done ? 0.45f : 1f);
+        et.animate().alpha(done ? 1f : 1f).setDuration(300).start();
+        dash.setAlpha(done ? 1f : 1f);
         Ui.pop(dash);
     }
 

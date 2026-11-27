@@ -19,19 +19,19 @@ public final class NoteStore {
     public static final String[] PAPER_NAMES = {"Cream", "Mint", "Blush", "Sky", "Lilac"};
     public static final int[] PAPER_RES = {R.drawable.paper_cream, R.drawable.paper_mint,
             R.drawable.paper_blush, R.drawable.paper_sky, R.drawable.paper_lilac};
-    public static final int[] PAPER_TOP = {0xFFFFFEF9, 0xFFF7FDF8, 0xFFFFF8F6, 0xFFF7FAFF, 0xFFFBF9FF};
-    public static final int[] PAPER_BOTTOM = {0xFFFBF3DF, 0xFFE4F3E7, 0xFFFBE6E1, 0xFFE3EDFA, 0xFFEDE6FA};
-    public static final int[] PAPER_RIM = {0xFFD3BB82, 0xFF93C4A0, 0xFFDDA096, 0xFF96B3DD, 0xFFB4A2DD};
-    public static final int[] TITLE = {0xFF7A6224, 0xFF3F7550, 0xFF9A4E48, 0xFF3F639A, 0xFF634E99};
-    public static final int INK = 0xFF1A3FB8;
-    public static final int INK_DARK = 0xFF122F8F;
+    public static final int[] PAPER_TOP = {0xFFF7F0E1, 0xFFEFF7EF, 0xFFFBEFEB, 0xFFEEF3FA, 0xFFF3EFF9};
+    public static final int[] PAPER_BOTTOM = {0xFFF3EAD8, 0xFFE6F1E7, 0xFFF7E6E1, 0xFFE5ECF6, 0xFFECE6F5};
+    public static final int[] PAPER_RIM = {0xFFDCD1BC, 0xFFC6D8C8, 0xFFE2CBC3, 0xFFC5D1E2, 0xFFD2C9E2};
+    public static final int[] TITLE = {0xFFC2B68A, 0xFF97B39E, 0xFFC9A59D, 0xFF9DAFC9, 0xFFAFA3C6};
+    public static final int INK = 0xFF3B5BD6;
+    public static final int INK_DARK = 0xFF3B5BD6;
 
-    public static final String[] FONT_NAMES = {"Kalam", "Caveat", "Patrick Hand"};
-    public static final int[] FONT_RES = {R.font.kalam, R.font.caveat, R.font.patrick};
-    /** Widget text size (dp) per font. */
-    public static final float[] WIDGET_DP = {14.5f, 19f, 16.5f};
+    public static final String[] FONT_NAMES = {"Kaushan", "Kalam", "Caveat", "Patrick Hand"};
+    public static final int[] FONT_RES = {R.font.kaushan, R.font.kalam, R.font.caveat, R.font.patrick};
+    /** Widget text size as a share of the line height, per font. */
+    public static final float[] WIDGET_K = {0.62f, 0.56f, 0.74f, 0.66f};
     /** Editor text size per font, so they all look about the same size. */
-    public static final float[] FONT_SP = {19f, 24f, 21.5f};
+    public static final float[] FONT_SP = {21f, 19f, 24f, 21.5f};
 
     public static final class Item {
         public String t;
@@ -170,6 +170,10 @@ public final class NoteStore {
         try { return c.getResources().getFont(FONT_RES[f]); } catch (Exception e) { return Typeface.DEFAULT; }
     }
 
+    public static Typeface title(Context c) {
+        try { return c.getResources().getFont(R.font.nunito_bold); } catch (Exception e) { return Typeface.DEFAULT_BOLD; }
+    }
+
     public static Typeface heading(Context c) {
         try { return c.getResources().getFont(R.font.nunito_heavy); } catch (Exception e) { return Typeface.DEFAULT_BOLD; }
     }
@@ -177,6 +181,6 @@ public final class NoteStore {
     public static void refreshWidgets(Context c) {
         AppWidgetManager m = AppWidgetManager.getInstance(c);
         int[] ids = m.getAppWidgetIds(new ComponentName(c, NotesWidget.class));
-        if (ids != null && ids.length > 0) m.notifyAppWidgetViewDataChanged(ids, R.id.stack);
+        if (ids != null && ids.length > 0) m.notifyAppWidgetViewDataChanged(ids, R.id.flip);
     }
 }

@@ -36,18 +36,18 @@ public class MainActivity extends Activity {
         col.setPadding(dp(16), dp(18), dp(16), dp(40));
         sv.addView(col);
 
-        TextView kicker = text("FABLE", 13, 0xFF9A6A0E, head);
+        TextView kicker = text("FABLE", 13, 0xFFB8963A, head);
         kicker.setLetterSpacing(0.28f);
         kicker.setPadding(dp(6), 0, 0, 0);
         col.addView(kicker);
-        TextView big = text("Notes", 40, 0xFF2B2111, head);
+        TextView big = text("Notes", 40, 0xFF2A2620, head);
         big.setPadding(dp(4), 0, 0, 0);
         col.addView(big);
-        TextView sub = text("Flick notes up or down on the widget. Tap a line to strike it off.", 14.5f, 0xFF4F4128, null);
+        TextView sub = text("Tap a line on the widget to strike it off. Tap the title for the next note.", 14.5f, 0xFF5A5448, null);
         sub.setPadding(dp(6), dp(2), dp(6), dp(16));
         col.addView(sub);
 
-        TextView hw = text("HANDWRITING", 11, 0xFF6E5520, head);
+        TextView hw = text("HANDWRITING", 11, 0xFF8A7E62, head);
         hw.setLetterSpacing(0.18f);
         hw.setPadding(dp(6), 0, 0, dp(8));
         col.addView(hw);
@@ -62,12 +62,12 @@ public class MainActivity extends Activity {
         grid.setClipChildren(false);
         col.addView(grid);
 
-        TextView tip = text("Put it on your home screen: long-press an empty spot → Widgets → Fable Notes. 3×3 shows the most lines.",
-                13.5f, 0xFF4F4128, null);
+        TextView tip = text("Put it on your home screen: long-press an empty spot → Widgets → Fable Notes. Bigger sizes show more lines.",
+                13.5f, 0xFF5A5448, null);
         GradientDrawable tg = new GradientDrawable();
         tg.setCornerRadius(dp(18));
-        tg.setColor(0xFFFFFDF7);
-        tg.setStroke(dp(1.5f), 0xFFD9C79A);
+        tg.setColor(0xFFF7F0E1);
+        tg.setStroke(dp(1.5f), 0xFFE5CC7C);
         tip.setBackground(tg);
         tip.setPadding(dp(16), dp(14), dp(16), dp(14));
         LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(-1, -2);
@@ -125,14 +125,14 @@ public class MainActivity extends Activity {
         int sel = NoteStore.font(this);
         for (int i = 0; i < NoteStore.FONT_NAMES.length; i++) {
             final int f = i;
-            TextView c = text(NoteStore.FONT_NAMES[i], i == 1 ? 21 : 17, i == sel ? 0xFFFFFFFF : 0xFF3E321A, NoteStore.hand(this, i));
+            TextView c = text(NoteStore.FONT_NAMES[i], i == 2 ? 21 : 17, i == sel ? 0xFFFFFFFF : 0xFF3B5BD6, NoteStore.hand(this, i));
             c.setGravity(Gravity.CENTER);
             c.setIncludeFontPadding(false);
             c.setPadding(dp(16), dp(9), dp(16), dp(9));
             GradientDrawable g = new GradientDrawable();
-            g.setColor(i == sel ? NoteStore.INK : 0xFFFFFDF7);
+            g.setColor(i == sel ? NoteStore.INK : 0xFFF7F0E1);
             g.setCornerRadius(dp(22));
-            g.setStroke(dp(1.5f), i == sel ? NoteStore.INK_DARK : 0xFFCDB884);
+            g.setStroke(dp(1.5f), i == sel ? NoteStore.INK : 0xFFE0D3B4);
             c.setBackground(g);
             c.setElevation(i == sel ? dp(3) : 0);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
@@ -170,9 +170,7 @@ public class MainActivity extends Activity {
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1);
             lp.setMargins(dp(3), dp(3), dp(3), dp(3));
             row.addView(tile, lp);
-            float tilt = n == null ? 0 : ((n.id * 7919) % 5 - 2) * 0.7f;
-            tile.setRotation(tilt);
-            Ui.squish(tile);
+                        Ui.squish(tile);
             tile.setOnClickListener(v -> {
                 v.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK);
                 Intent e = new Intent(this, EditorActivity.class);

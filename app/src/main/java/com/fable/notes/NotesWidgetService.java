@@ -32,15 +32,12 @@ public class NotesWidgetService extends RemoteViewsService {
     static final int[] CHK = {R.id.c0, R.id.c1, R.id.c2, R.id.c3, R.id.c4, R.id.c5, R.id.c6,
             R.id.c7, R.id.c8, R.id.c9, R.id.c10, R.id.c11, R.id.c12, R.id.c13};
 
-    // layout constants (dp) — must match card.xml / widget_root.xml
-    static final float ROW_DP = 22f, TITLE_DP = 16f;
-    static final float PAD_L = 14f, PAD_R = 12f, PAD_T = 12f, PAD_B = 10f;
 
     static class Factory implements RemoteViewsFactory {
         private final Context c;
         private final int wid;
         private List<NoteStore.Note> notes = new ArrayList<>();
-        private float cardW = 220, cardH = 220;
+        private Geometry g;
         private String lastError;
 
         Factory(Context c, int wid) { this.c = c; this.wid = wid; }
@@ -56,9 +53,7 @@ public class NotesWidgetService extends RemoteViewsService {
 
         private void load() {
             notes = NoteStore.all(c);
-            Geometry g = Geometry.of(c, wid);
-            cardW = g.cardW;
-            cardH = g.cardH;
+            g = Geometry.of(c, wid);
         }
 
         @Override
@@ -71,11 +66,13 @@ public class NotesWidgetService extends RemoteViewsService {
                 rv.setViewVisibility(R.id.err, View.VISIBLE);
                 rv.setTextViewText(R.id.err, "Widget error: " + t);
                 for (int r : ROW) rv.setViewVisibility(r, View.GONE);
+                rv.setViewPadding(R.id.content, 40, 60, 40, 20);
                 return rv;
             }
         }
 
         RemoteViews build(int pos) {
+            if (g == null) g = Geometry.of(c, wid);
             RemoteViews rv = new RemoteViews(c.getPackageName(), R.layout.card);
             if (pos >= notes.size()) return rv;
             NoteStore.Note n = notes.get(pos);
@@ -83,36 +80,50 @@ public class NotesWidgetService extends RemoteViewsService {
             Typeface hand = NoteStore.hand(c, font);
             float d = c.getResources().getDisplayMetrics().density;
             int dpi = c.getResources().getDisplayMetrics().densityDpi;
+            int dip = TypedValue.COMPLEX_UNIT_DIP;
 
-            rv.setViewLayoutWidth(R.id.card, cardW, TypedValue.COMPLEX_UNIT_DIP);
-            rv.setViewLayoutHeight(R.id.card, cardH, TypedValue.COMPLEX_UNIT_DIP);
             rv.setInt(R.id.card, "setBackgroundResource", NoteStore.PAPER_RES[n.color]);
+            int m = Math.round(g.margin * d);
+            rv.setViewPadding(R.id.content, m, m + Math.round(g.titleTop * d), m, m);
 
-            float textW = cardW - PAD_L - PAD_R - 4;
             String title = n.title == null || n.title.trim().isEmpty() ? "NOTE" : n.title.trim().toUpperCase();
-            Line tl = renderColor(title, NoteStore.heading(c), 10.5f, 0.12f, textW, TITLE_DP, d, dpi, NoteStore.TITLE[n.color]);
+            float textW = g.paper - g.indent - g.paper * 0.07f;
+            Line tl = renderColor(title, NoteStore.title(c), g.titleSize, 0.04f, textW, g.titleH, d, dpi,
+                    NoteStore.TITLE[n.color]);
             rv.setImageViewBitmap(R.id.title, tl.bmp);
+            rv.setViewPadding(R.id.title, Math.round(g.indent * d), 0, 0, 0);
+            rv.setViewLayoutMargin(R.id.title, RemoteViews.MARGIN_BOTTOM, g.titleGap, dip);
 
             Intent open = new Intent().putExtra("op", "open").putExtra("id", n.id);
+            Intent next = new Intent().putExtra("op", "next");
             rv.setOnClickFillInIntent(R.id.card, open);
-            rv.setOnClickFillInIntent(R.id.title, open);
+            rv.setOnClickFillInIntent(R.id.title, next);
 
-            int fit = (int) Math.floor((cardH - 3 - PAD_T - PAD_B - TITLE_DP - 2) / ROW_DP);
-            fit = Math.max(1, Math.min(ROW.length, fit));
+            int fit = g.rows;
+            boolean more = n.items.size() > fit;
+            float size = g.rowH * NoteStore.WIDGET_K[font];
             for (int i = 0; i < ROW.length; i++) {
                 if (i >= fit) { rv.setViewVisibility(ROW[i], View.GONE); continue; }
                 rv.setViewVisibility(ROW[i], View.VISIBLE);
+                rv.setViewLayoutHeight(ROW[i], g.rowH, dip);
+                rv.setViewPadding(ROW[i], Math.round(g.indent * d), 0, 0, 0);
                 rv.setOnClickFillInIntent(ROW[i], open);
-                if (i < n.items.size()) {
+                boolean dots = more && i == fit - 1;
+                if (i < n.items.size() && !dots) {
                     NoteStore.Item it = n.items.get(i);
-                    Line l = render("– " + it.t, hand, NoteStore.WIDGET_DP[font], 0f, textW - 6, ROW_DP, d, dpi);
+                    Line l = render("- " + it.t, hand, size, 0f, textW, g.rowH, d, dpi);
                     rv.setViewVisibility(TXT[i], View.VISIBLE);
                     rv.setImageViewBitmap(TXT[i], l.bmp);
                     rv.setViewVisibility(CHK[i], View.VISIBLE);
-                    rv.setViewLayoutWidth(CHK[i], l.widthDp + 5, TypedValue.COMPLEX_UNIT_DIP);
+                    rv.setViewLayoutWidth(CHK[i], l.widthDp + 3, dip);
                     rv.setCompoundButtonChecked(CHK[i], it.d);
                     Intent t = new Intent().putExtra("op", "toggle").putExtra("id", n.id).putExtra("idx", i);
                     rv.setOnCheckedChangeResponse(CHK[i], RemoteViews.RemoteResponse.fromFillInIntent(t));
+                } else if (dots) {
+                    Line l = render("...", hand, size, 0.1f, textW, g.rowH, d, dpi);
+                    rv.setViewVisibility(TXT[i], View.VISIBLE);
+                    rv.setImageViewBitmap(TXT[i], l.bmp);
+                    rv.setViewVisibility(CHK[i], View.GONE);
                 } else {
                     rv.setViewVisibility(TXT[i], View.GONE);
                     rv.setViewVisibility(CHK[i], View.GONE);

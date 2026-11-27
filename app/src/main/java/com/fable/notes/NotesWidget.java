@@ -22,29 +22,33 @@ public class NotesWidget extends AppWidgetProvider {
 
     @Override
     public void onAppWidgetOptionsChanged(Context c, AppWidgetManager m, int id, Bundle o) {
-        // widget was resized: redraw the cards at the new size
         m.updateAppWidget(id, build(c, id));
-        m.notifyAppWidgetViewDataChanged(id, R.id.stack);
+        m.notifyAppWidgetViewDataChanged(id, R.id.flip);
     }
 
     static RemoteViews build(Context c, int wid) {
         RemoteViews rv = new RemoteViews(c.getPackageName(), R.layout.widget_root);
+        Geometry g = Geometry.of(c, wid);
+        int dip = TypedValue.COMPLEX_UNIT_DIP;
+        rv.setViewLayoutWidth(R.id.base, g.side, dip);
+        rv.setViewLayoutHeight(R.id.base, g.side, dip);
+        rv.setViewLayoutWidth(R.id.back, g.backView, dip);
+        rv.setViewLayoutHeight(R.id.back, g.backView, dip);
+        rv.setViewLayoutWidth(R.id.flip, g.frontView, dip);
+        rv.setViewLayoutHeight(R.id.flip, g.frontView, dip);
+        rv.setViewLayoutWidth(R.id.empty, g.frontView, dip);
+        rv.setViewLayoutHeight(R.id.empty, g.frontView, dip);
 
         Intent svc = new Intent(c, NotesWidgetService.class);
         svc.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, wid);
         svc.setData(Uri.parse(svc.toUri(Intent.URI_INTENT_SCHEME)));
-        rv.setRemoteAdapter(R.id.stack, svc);
-        rv.setEmptyView(R.id.stack, R.id.empty);
+        rv.setRemoteAdapter(R.id.flip, svc);
+        rv.setEmptyView(R.id.flip, R.id.empty);
 
-        Geometry g = Geometry.of(c, wid);
-        int dip = TypedValue.COMPLEX_UNIT_DIP;
-        rv.setViewLayoutWidth(R.id.stack, g.stackW, dip);
-        rv.setViewLayoutHeight(R.id.stack, g.stackH, dip);
-        rv.setViewLayoutMargin(R.id.stack, RemoteViews.MARGIN_START, g.stackLeft, dip);
-        rv.setViewLayoutMargin(R.id.stack, RemoteViews.MARGIN_TOP, g.stackTop, dip);
-
-        Intent tpl = new Intent(c, NotesWidget.class).setAction(ACT_ITEM);
-        rv.setPendingIntentTemplate(R.id.stack, PendingIntent.getBroadcast(c, 0, tpl,
+        Intent tpl = new Intent(c, NotesWidget.class).setAction(ACT_ITEM)
+                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, wid)
+                .setData(Uri.parse("fable://item/" + wid));
+        rv.setPendingIntentTemplate(R.id.flip, PendingIntent.getBroadcast(c, wid, tpl,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE));
 
         Intent app = new Intent(c, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -59,10 +63,17 @@ public class NotesWidget extends AppWidgetProvider {
         if (!ACT_ITEM.equals(in.getAction())) return;
         String op = in.getStringExtra("op");
         long id = in.getLongExtra("id", -1);
-        if ("toggle".equals(op)) {
+        int wid = in.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID);
+        AppWidgetManager m = AppWidgetManager.getInstance(c);
+        if ("next".equals(op)) {
+            if (wid == AppWidgetManager.INVALID_APPWIDGET_ID) return;
+            RemoteViews rv = new RemoteViews(c.getPackageName(), R.layout.widget_root);
+            rv.showNext(R.id.flip);
+            m.partiallyUpdateAppWidget(wid, rv);
+        } else if ("toggle".equals(op)) {
             boolean checked = in.getBooleanExtra(RemoteViews.EXTRA_CHECKED, false);
             NoteStore.setDone(c, id, in.getIntExtra("idx", -1), checked);
-            // let the ink scribble finish drawing before the card re-renders
+            // let the ink scribble finish before the card re-renders
             PendingResult r = goAsync();
             new Handler(Looper.getMainLooper()).postDelayed(() -> {
                 NoteStore.refreshWidgets(c);

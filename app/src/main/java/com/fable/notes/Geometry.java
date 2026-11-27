@@ -4,17 +4,16 @@ import android.appwidget.AppWidgetManager;
 import android.content.Context;
 import android.os.Bundle;
 
-/**
- * Widget card sizing. StackView makes each card 90% of its own size, puts the front card
- * at the left and 10% down, and fans the others up-right. So we make the StackView a bit
- * bigger than the widget and shift it, so the front card is big and centred.
- */
+/** Proportions measured from the reference image (all in dp, scaled to the widget size). */
 final class Geometry {
-    static final float PAD_X = 10, PAD_TOP = 10, PAD_BOTTOM = 15; // widget_root padding
-    static final float GAP = 6;     // space around the front card (back cards peek here)
-    static final float FRAME = 4;   // StackView frames each card with 4dp padding
+    static final float FRONT = 0.80f;   // front paper side / yellow square side
+    static final float BACK = 0.81f;    // back paper side / yellow square side
+    static final float VIEW = 1.08f;    // paper drawables carry a 4% shadow margin on each side
+    static final float ROW = 0.105f;    // line height / paper side (reference is 0.17: we fit more lines)
 
-    float cardW, cardH, stackW, stackH, stackLeft, stackTop;
+    float side, paper, back, frontView, backView, margin;
+    float rowH, titleTop, titleH, titleSize, titleGap, indent;
+    int rows;
 
     static Geometry of(Context c, int wid) {
         float w = 250, h = 250;
@@ -26,13 +25,20 @@ final class Geometry {
             if (maxH > 40) h = maxH;   // portrait: height = max height
         }
         Geometry g = new Geometry();
-        g.cardW = Math.max(80, w - 2 * PAD_X - 2 * GAP);
-        g.cardH = Math.max(80, h - PAD_TOP - PAD_BOTTOM - 2 * GAP);
-        g.stackW = (g.cardW + 2 * FRAME) / 0.9f;
-        g.stackH = (g.cardH + 2 * FRAME) / 0.9f;
-        // front card: x = stackLeft + FRAME, y = stackTop + 0.1*stackH + FRAME
-        g.stackLeft = GAP - FRAME;
-        g.stackTop = GAP - FRAME - 0.1f * g.stackH;
+        g.side = Math.max(100, Math.min(w, h) - 6);
+        g.paper = g.side * FRONT;
+        g.back = g.side * BACK;
+        g.frontView = g.paper * VIEW;
+        g.backView = g.back * VIEW;
+        g.margin = g.paper * 0.04f;
+        g.rowH = Math.max(15f, g.paper * ROW);
+        g.titleTop = g.paper * 0.095f;
+        g.titleSize = g.paper * 0.056f;
+        g.titleH = g.titleSize * 1.5f;
+        g.titleGap = g.paper * 0.05f;
+        g.indent = g.paper * 0.09f;
+        float usable = g.paper - g.titleTop - g.titleH - g.titleGap - g.paper * 0.035f;
+        g.rows = Math.max(1, Math.min(14, (int) Math.floor(usable / g.rowH)));
         return g;
     }
 }

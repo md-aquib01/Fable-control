@@ -2,18 +2,18 @@ package com.fable.notes;
 
 import android.content.Context;
 import android.graphics.Canvas;
-import android.graphics.DashPathEffect;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
 import android.graphics.Typeface;
+import android.text.TextPaint;
 import android.text.TextUtils;
 import android.view.View;
 
-/** Square mini paper note (or the "new note" tile) for the home grid. */
+/** A mini copy of the widget: yellow square, back paper, tilted front note. */
 class NoteTile extends View {
     private final NoteStore.Note note;
-    private final Typeface hand, head;
+    private final Typeface hand, title;
     private final int font;
     private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF r = new RectF();
@@ -23,7 +23,7 @@ class NoteTile extends View {
         this.note = note;
         this.font = font;
         this.hand = NoteStore.hand(c, font);
-        this.head = NoteStore.heading(c);
+        this.title = NoteStore.title(c);
         setClickable(true);
     }
 
@@ -33,100 +33,105 @@ class NoteTile extends View {
         setMeasuredDimension(size, size);
     }
 
-    private float dp(float v) { return Ui.dp(getContext(), v); }
-
     @Override
     protected void onDraw(Canvas cv) {
-        float pad = dp(5);
-        r.set(pad, pad, getWidth() - pad, getHeight() - pad - dp(5));
-        float rad = dp(18);
-        if (note == null) { drawNew(cv, rad); return; }
+        float S = Math.min(getWidth(), getHeight()) - Ui.dp(getContext(), 8);
+        float ox = (getWidth() - S) / 2f, oy = (getHeight() - S) / 2f;
+        float cx = ox + S / 2f, cy = oy + S / 2f;
+        r.set(ox, oy, ox + S, oy + S);
+        Ui.drawBase(cv, r, p);
 
-        int col = note.color;
-        Ui.drawPaper(cv, r, rad, NoteStore.PAPER_TOP[col], NoteStore.PAPER_BOTTOM[col], NoteStore.PAPER_RIM[col], dp(3), p);
+        float lift = S * 0.012f;
+        // back paper
+        float b = S * Geometry.BACK;
+        cv.save();
+        cv.rotate(-1f, cx, cy);
+        r.set(cx - b / 2, cy - b / 2, cx + b / 2, cy + b / 2);
+        Ui.drawPaper(cv, r, b * 0.046f, 0xFFF3EBDB, 0xFFEFE6D4, 0xFFD8CDB6, lift, p);
+        cv.restore();
 
-        float x = r.left + dp(14);
-        float right = r.right - dp(12);
-        float y = r.top + dp(22);
-        p.reset();
-        p.setAntiAlias(true);
-        p.setTypeface(head);
-        p.setTextSize(dp(10.5f));
-        p.setLetterSpacing(0.12f);
-        p.setColor(NoteStore.TITLE[col]);
+        // front paper
+        float f = S * Geometry.FRONT;
+        int col = note == null ? 0 : note.color;
+        cv.save();
+        cv.rotate(-7.4f, cx, cy);
+        r.set(cx - f / 2, cy - f / 2, cx + f / 2, cy + f / 2);
+        Ui.drawPaper(cv, r, f * 0.046f, NoteStore.PAPER_TOP[col], NoteStore.PAPER_BOTTOM[col], NoteStore.PAPER_RIM[col], lift, p);
+        float left = r.left, top = r.top;
+        float indent = f * 0.09f;
+
+        if (note == null) {
+            // "new note": a big hand-drawn plus
+            Paint ink = new Paint(Paint.ANTI_ALIAS_FLAG);
+            ink.setStyle(Paint.Style.STROKE);
+            ink.setStrokeCap(Paint.Cap.ROUND);
+            ink.setStrokeWidth(f * 0.035f);
+            ink.setColor(NoteStore.INK);
+            Path plus = new Path();
+            plus.moveTo(cx - f * 0.13f, cy - f * 0.04f);
+            plus.quadTo(cx, cy - f * 0.055f, cx + f * 0.14f, cy - f * 0.03f);
+            plus.moveTo(cx - f * 0.01f, cy - f * 0.17f);
+            plus.quadTo(cx + f * 0.01f, cy - f * 0.03f, cx - f * 0.005f, cy + f * 0.1f);
+            cv.drawPath(plus, ink);
+            TextPaint tp = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+            tp.setTypeface(title);
+            tp.setTextSize(f * 0.07f);
+            tp.setLetterSpacing(0.04f);
+            tp.setColor(NoteStore.TITLE[0]);
+            tp.setTextAlign(Paint.Align.CENTER);
+            cv.drawText("NEW NOTE", cx, cy + f * 0.3f, tp);
+            cv.restore();
+            return;
+        }
+
+        TextPaint tt = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+        tt.setTypeface(title);
+        tt.setTextSize(f * 0.056f);
+        tt.setLetterSpacing(0.04f);
+        tt.setColor(NoteStore.TITLE[col]);
         String t = note.title == null || note.title.trim().isEmpty() ? "NOTE" : note.title.trim().toUpperCase();
-        cv.drawText(TextUtils.ellipsize(t, new android.text.TextPaint(p), right - x, TextUtils.TruncateAt.END).toString(), x, y, p);
+        float maxW = f - indent - f * 0.07f;
+        float titleTop = top + f * 0.095f;
+        cv.drawText(TextUtils.ellipsize(t, tt, maxW, TextUtils.TruncateAt.END).toString(), left + indent,
+                titleTop + f * 0.056f * 1.1f, tt);
 
-        float line = dp(21);
-        float textSize = dp(new float[]{14f, 18f, 16f}[font]);
-        float rowTop = y + dp(6);
-        android.text.TextPaint tp = new android.text.TextPaint(Paint.ANTI_ALIAS_FLAG);
+        float rowH = f * Geometry.ROW;
+        float y = titleTop + f * 0.056f * 1.5f + f * 0.05f;
+        TextPaint tp = new TextPaint(Paint.ANTI_ALIAS_FLAG);
         tp.setTypeface(hand);
-        tp.setTextSize(textSize);
+        tp.setTextSize(rowH * NoteStore.WIDGET_K[font]);
+        tp.setColor(NoteStore.INK);
         Paint rule = new Paint(Paint.ANTI_ALIAS_FLAG);
-        rule.setColor(0x477A6030);
-        rule.setStrokeWidth(dp(1));
+        rule.setColor(0xFFE9E0CB);
+        rule.setStrokeWidth(Math.max(1f, f * 0.004f));
         Paint strike = new Paint(Paint.ANTI_ALIAS_FLAG);
         strike.setStyle(Paint.Style.STROKE);
         strike.setStrokeCap(Paint.Cap.ROUND);
-        strike.setStrokeWidth(dp(1.6f));
-        strike.setColor(NoteStore.INK_DARK);
+        strike.setStrokeWidth(Math.max(1.5f, f * 0.009f));
+        strike.setColor(NoteStore.INK);
+        android.graphics.Rect cap = new android.graphics.Rect();
+        tp.getTextBounds("H", 0, 1, cap);
 
-        int i = 0;
-        while (rowTop + line <= r.bottom - dp(8)) {
-            float base = rowTop + line * 0.7f;
-            if (i < note.items.size()) {
+        int fit = (int) Math.floor((top + f - f * 0.035f - y) / rowH);
+        boolean more = note.items.size() > fit;
+        for (int i = 0; i < fit; i++) {
+            float base = y + rowH / 2f + cap.height() / 2f;
+            boolean dots = more && i == fit - 1;
+            if (dots) {
+                cv.drawText("...", left + indent, base, tp);
+            } else if (i < note.items.size()) {
                 NoteStore.Item it = note.items.get(i);
-                String s = TextUtils.ellipsize("– " + it.t, tp, right - x, TextUtils.TruncateAt.END).toString();
-                tp.setColor(it.d ? 0x801A3FB8 : NoteStore.INK);
-                cv.drawText(s, x, base, tp);
+                String s = TextUtils.ellipsize("- " + it.t, tp, maxW, TextUtils.TruncateAt.END).toString();
+                cv.drawText(s, left + indent, base, tp);
                 if (it.d) {
                     float w = tp.measureText(s);
-                    cv.drawPath(Ui.wave(x - dp(1), x + w + dp(3), rowTop + line * 0.55f, dp(0.9f), dp(11)), strike);
+                    cv.drawPath(Ui.wave(left + indent - f * 0.005f, left + indent + w + f * 0.01f,
+                            y + rowH * 0.56f, f * 0.003f, f * 0.07f), strike);
                 }
             }
-            cv.drawLine(r.left + dp(4), rowTop + line, r.right - dp(4), rowTop + line, rule);
-            rowTop += line;
-            i++;
+            y += rowH;
+            cv.drawLine(left + 1, y, left + f - 1, y, rule);
         }
-    }
-
-    private void drawNew(Canvas cv, float rad) {
-        p.reset();
-        p.setAntiAlias(true);
-        p.setStyle(Paint.Style.FILL);
-        p.setColor(0x80FFFDF7);
-        cv.drawRoundRect(r, rad, rad, p);
-        p.setStyle(Paint.Style.STROKE);
-        p.setStrokeWidth(dp(2));
-        p.setColor(0xFFB08A3E);
-        p.setPathEffect(new DashPathEffect(new float[]{dp(7), dp(6)}, 0));
-        cv.drawRoundRect(r, rad, rad, p);
-        p.setPathEffect(null);
-
-        float cx = r.centerX(), cy = r.centerY() - dp(10), br = dp(24);
-        p.setStyle(Paint.Style.FILL);
-        p.setColor(0x332E1C00);
-        cv.drawCircle(cx, cy + dp(4), br, p);
-        p.setColor(NoteStore.INK_DARK);
-        cv.drawCircle(cx, cy + dp(2.5f), br, p);
-        p.setColor(NoteStore.INK);
-        cv.drawCircle(cx, cy, br, p);
-        p.setStyle(Paint.Style.STROKE);
-        p.setStrokeCap(Paint.Cap.ROUND);
-        p.setStrokeWidth(dp(3.2f));
-        p.setColor(0xFFFFFFFF);
-        Path plus = new Path();
-        plus.moveTo(cx - dp(8), cy); plus.lineTo(cx + dp(8), cy);
-        plus.moveTo(cx, cy - dp(8)); plus.lineTo(cx, cy + dp(8));
-        cv.drawPath(plus, p);
-
-        p.reset();
-        p.setAntiAlias(true);
-        p.setTypeface(head);
-        p.setTextSize(dp(14));
-        p.setColor(0xFF5E4718);
-        p.setTextAlign(Paint.Align.CENTER);
-        cv.drawText("New note", cx, cy + br + dp(26), p);
+        cv.restore();
     }
 }

@@ -43,7 +43,7 @@ class PaperLayout extends LinearLayout {
     protected void onDraw(Canvas cv) {
         float lift = Ui.dp(getContext(), 4);
         r.set(0, 0, getWidth(), getHeight() - lift * 1.7f);
-        Ui.drawPaper(cv, r, Ui.dp(getContext(), 24), top, bottom, rim, lift, p);
+        Ui.drawPaper(cv, r, Ui.dp(getContext(), 14), top, bottom, rim, lift, p);
         super.onDraw(cv);
     }
 }
