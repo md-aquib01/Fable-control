@@ -44,7 +44,7 @@ class InkRow extends FrameLayout {
         int h = Ui.dpi(c, sp * 2.0f);
         setLayoutParams(new LinearLayout.LayoutParams(-1, h));
 
-        rule.setColor(0x2B8A6A2E);
+        rule.setColor(0x4D8A6A2E);
         rule.setStrokeWidth(Ui.dp(c, 1));
         ink.setStyle(Paint.Style.STROKE);
         ink.setStrokeCap(Paint.Cap.ROUND);
@@ -72,7 +72,7 @@ class InkRow extends FrameLayout {
         et.setTypeface(hand);
         et.setTextSize(sp);
         et.setTextColor(NoteStore.INK);
-        et.setHintTextColor(0x552D57D6);
+        et.setHintTextColor(0x551C44C4);
         et.setIncludeFontPadding(false);
         et.setSingleLine(true);
         et.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);

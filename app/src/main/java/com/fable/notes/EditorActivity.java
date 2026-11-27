@@ -119,7 +119,7 @@ public class EditorActivity extends Activity implements InkRow.Host {
         more.setText("+  add a line");
         more.setTypeface(hand);
         more.setTextSize(sp * 0.85f);
-        more.setTextColor(0x772D57D6);
+        more.setTextColor(0x881C44C4);
         more.setPadding(dp(10), dp(10), dp(10), dp(4));
         more.setOnClickListener(v -> {
             InkRow r = addRow(rows.getChildCount(), "", false, true);

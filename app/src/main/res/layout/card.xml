@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="wrap_content" android:layout_height="wrap_content">
+    <FrameLayout android:id="@+id/card" android:layout_width="220dp" android:layout_height="220dp"
+        android:background="@drawable/paper_cream" android:paddingStart="14dp" android:paddingEnd="12dp"
+        android:paddingTop="12dp" android:paddingBottom="10dp">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical">
+            <ImageView android:id="@+id/title" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:layout_marginBottom="2dp"/>
+            <FrameLayout android:id="@+id/r0" android:layout_width="match_parent" android:layout_height="22dp" android:background="@drawable/rule">
+                <ImageView android:id="@+id/t0" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center_vertical"/>
+                <CheckBox android:id="@+id/c0" android:layout_width="40dp" android:layout_height="match_parent"
+                    android:button="@null" android:background="@drawable/strike" android:minWidth="0dp" android:minHeight="0dp"
+                    android:padding="0dp" android:text="" android:contentDescription="Strike line 1"/>
+            </FrameLayout>
+            <FrameLayout android:id="@+id/r1" android:layout_width="match_parent" android:layout_height="22dp" android:background="@drawable/rule">
+                <ImageView android:id="@+id/t1" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center_vertical"/>
+                <CheckBox android:id="@+id/c1" android:layout_width="40dp" android:layout_height="match_parent"
+                    android:button="@null" android:background="@drawable/strike" android:minWidth="0dp" android:minHeight="0dp"
+                    android:padding="0dp" android:text="" android:contentDescription="Strike line 2"/>
+            </FrameLayout>
+            <FrameLayout android:id="@+id/r2" android:layout_width="match_parent" android:layout_height="22dp" android:background="@drawable/rule">
+                <ImageView android:id="@+id/t2" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center_vertical"/>
+                <CheckBox android:id="@+id/c2" android:layout_width="40dp" android:layout_height="match_parent"
+                    android:button="@null" android:background="@drawable/strike" android:minWidth="0dp" android:minHeight="0dp"
+                    android:padding="0dp" android:text="" android:contentDescription="Strike line 3"/>
+            </FrameLayout>
+            <FrameLayout android:id="@+id/r3" android:layout_width="match_parent" android:layout_height="22dp" android:background="@drawable/rule">
+                <ImageView android:id="@+id/t3" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center_vertical"/>
+                <CheckBox android:id="@+id/c3" android:layout_width="40dp" android:layout_height="match_parent"
+                    android:button="@null" android:background="@drawable/strike" android:minWidth="0dp" android:minHeight="0dp"
+                    android:padding="0dp" android:text="" android:contentDescription="Strike line 4"/>
+            </FrameLayout>
+            <FrameLayout android:id="@+id/r4" android:layout_width="match_parent" android:layout_height="22dp" android:background="@drawable/rule">
+                <ImageView android:id="@+id/t4" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center_vertical"/>
+                <CheckBox android:id="@+id/c4" android:layout_width="40dp" android:layout_height="match_parent"
+                    android:button="@null" android:background="@drawable/strike" android:minWidth="0dp" android:minHeight="0dp"
+                    android:padding="0dp" android:text="" android:contentDescription="Strike line 5"/>
+            </FrameLayout>
+            <FrameLayout android:id="@+id/r5" android:layout_width="match_parent" android:layout_height="22dp" android:background="@drawable/rule">
+                <ImageView android:id="@+id/t5" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center_vertical"/>
+                <CheckBox android:id="@+id/c5" android:layout_width="40dp" android:layout_height="match_parent"
+                    android:button="@null" android:background="@drawable/strike" android:minWidth="0dp" android:minHeight="0dp"
+                    android:padding="0dp" android:text="" android:contentDescription="Strike line 6"/>
+            </FrameLayout>
+            <FrameLayout android:id="@+id/r6" android:layout_width="match_parent" android:layout_height="22dp" android:background="@drawable/rule">
+                <ImageView android:id="@+id/t6" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center_vertical"/>
+                <CheckBox android:id="@+id/c6" android:layout_width="40dp" android:layout_height="match_parent"
+                    android:button="@null" android:background="@drawable/strike" android:minWidth="0dp" android:minHeight="0dp"
+                    android:padding="0dp" android:text="" android:contentDescription="Strike line 7"/>
+            </FrameLayout>
+            <FrameLayout android:id="@+id/r7" android:layout_width="match_parent" android:layout_height="22dp" android:background="@drawable/rule">
+                <ImageView android:id="@+id/t7" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center_vertical"/>
+                <CheckBox android:id="@+id/c7" android:layout_width="40dp" android:layout_height="match_parent"
+                    android:button="@null" android:background="@drawable/strike" android:minWidth="0dp" android:minHeight="0dp"
+                    android:padding="0dp" android:text="" android:contentDescription="Strike line 8"/>
+            </FrameLayout>
+            <FrameLayout android:id="@+id/r8" android:layout_width="match_parent" android:layout_height="22dp" android:background="@drawable/rule">
+                <ImageView android:id="@+id/t8" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center_vertical"/>
+                <CheckBox android:id="@+id/c8" android:layout_width="40dp" android:layout_height="match_parent"
+                    android:button="@null" android:background="@drawable/strike" android:minWidth="0dp" android:minHeight="0dp"
+                    android:padding="0dp" android:text="" android:contentDescription="Strike line 9"/>
+            </FrameLayout>
+            <FrameLayout android:id="@+id/r9" android:layout_width="match_parent" android:layout_height="22dp" android:background="@drawable/rule">
+                <ImageView android:id="@+id/t9" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center_vertical"/>
+                <CheckBox android:id="@+id/c9" android:layout_width="40dp" android:layout_height="match_parent"
+                    android:button="@null" android:background="@drawable/strike" android:minWidth="0dp" android:minHeight="0dp"
+                    android:padding="0dp" android:text="" android:contentDescription="Strike line 10"/>
+            </FrameLayout>
+            <FrameLayout android:id="@+id/r10" android:layout_width="match_parent" android:layout_height="22dp" android:background="@drawable/rule">
+                <ImageView android:id="@+id/t10" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center_vertical"/>
+                <CheckBox android:id="@+id/c10" android:layout_width="40dp" android:layout_height="match_parent"
+                    android:button="@null" android:background="@drawable/strike" android:minWidth="0dp" android:minHeight="0dp"
+                    android:padding="0dp" android:text="" android:contentDescription="Strike line 11"/>
+            </FrameLayout>
+            <FrameLayout android:id="@+id/r11" android:layout_width="match_parent" android:layout_height="22dp" android:background="@drawable/rule">
+                <ImageView android:id="@+id/t11" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center_vertical"/>
+                <CheckBox android:id="@+id/c11" android:layout_width="40dp" android:layout_height="match_parent"
+                    android:button="@null" android:background="@drawable/strike" android:minWidth="0dp" android:minHeight="0dp"
+                    android:padding="0dp" android:text="" android:contentDescription="Strike line 12"/>
+            </FrameLayout>
+            <FrameLayout android:id="@+id/r12" android:layout_width="match_parent" android:layout_height="22dp" android:background="@drawable/rule">
+                <ImageView android:id="@+id/t12" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center_vertical"/>
+                <CheckBox android:id="@+id/c12" android:layout_width="40dp" android:layout_height="match_parent"
+                    android:button="@null" android:background="@drawable/strike" android:minWidth="0dp" android:minHeight="0dp"
+                    android:padding="0dp" android:text="" android:contentDescription="Strike line 13"/>
+            </FrameLayout>
+            <FrameLayout android:id="@+id/r13" android:layout_width="match_parent" android:layout_height="22dp" android:background="@drawable/rule">
+                <ImageView android:id="@+id/t13" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center_vertical"/>
+                <CheckBox android:id="@+id/c13" android:layout_width="40dp" android:layout_height="match_parent"
+                    android:button="@null" android:background="@drawable/strike" android:minWidth="0dp" android:minHeight="0dp"
+                    android:padding="0dp" android:text="" android:contentDescription="Strike line 14"/>
+            </FrameLayout>
+        </LinearLayout>
+    </FrameLayout>
+</FrameLayout>

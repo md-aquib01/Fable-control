@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:top="5dp" android:left="2dp" android:right="2dp">
-        <shape><corners android:radius="18dp"/><solid android:color="#147A5A1A"/></shape></item>
+        <shape><corners android:radius="18dp"/><solid android:color="#40704A08"/></shape></item>
     <item android:top="2dp">
-        <shape><corners android:radius="18dp"/><solid android:color="#CFC2E8"/></shape></item>
+        <shape><corners android:radius="18dp"/><solid android:color="#BDAEDF"/></shape></item>
     <item android:bottom="3dp">
         <shape><corners android:radius="18dp"/>
-            <gradient android:angle="270" android:startColor="#FAF6FF" android:endColor="#E1D6F3"/></shape></item>
+            <gradient android:angle="270" android:startColor="#FCFAFF" android:endColor="#E7DEF7"/></shape></item>
     <item android:bottom="3dp">
         <shape><corners android:radius="18dp"/>
             <gradient android:type="radial" android:gradientRadius="90%" android:centerX="0.2" android:centerY="0.05"

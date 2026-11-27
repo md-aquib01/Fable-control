@@ -19,16 +19,17 @@ public final class NoteStore {
     public static final String[] PAPER_NAMES = {"Cream", "Mint", "Blush", "Sky", "Lilac"};
     public static final int[] PAPER_RES = {R.drawable.paper_cream, R.drawable.paper_mint,
             R.drawable.paper_blush, R.drawable.paper_sky, R.drawable.paper_lilac};
-    public static final int[] PAPER_TOP = {0xFFFFFDF5, 0xFFF6FDF7, 0xFFFFF7F4, 0xFFF5FAFF, 0xFFFAF6FF};
-    public static final int[] PAPER_BOTTOM = {0xFFF3E6C6, 0xFFD6EDDA, 0xFFF5D8D1, 0xFFD5E4F6, 0xFFE1D6F3};
-    public static final int[] PAPER_RIM = {0xFFE3D3AE, 0xFFBFDCC5, 0xFFE8C3BB, 0xFFBDD0EA, 0xFFCFC2E8};
-    public static final int[] TITLE = {0xFFB7A26A, 0xFF77A381, 0xFFC78880, 0xFF7896BE, 0xFF9582BF};
-    public static final int INK = 0xFF2D57D6;
-    public static final int INK_DARK = 0xFF2449BE;
+    public static final int[] PAPER_TOP = {0xFFFFFEF8, 0xFFF9FFFA, 0xFFFFFAF8, 0xFFF9FCFF, 0xFFFCFAFF};
+    public static final int[] PAPER_BOTTOM = {0xFFF6ECD2, 0xFFDDF2E1, 0xFFF8E0DA, 0xFFDDEAF9, 0xFFE7DEF7};
+    public static final int[] PAPER_RIM = {0xFFCDB37A, 0xFFA3CCAD, 0xFFDDAAA1, 0xFFA6BEE0, 0xFFBDAEDF};
+    public static final int[] TITLE = {0xFF8A7232, 0xFF4E8460, 0xFFA8605A, 0xFF4F74A8, 0xFF7560A8};
+    public static final int INK = 0xFF1C44C4;
+    public static final int INK_DARK = 0xFF16379E;
 
     public static final String[] FONT_NAMES = {"Kalam", "Caveat", "Patrick Hand"};
     public static final int[] FONT_RES = {R.font.kalam, R.font.caveat, R.font.patrick};
-    public static final int[] CARD_LAYOUT = {R.layout.card_kalam, R.layout.card_caveat, R.layout.card_patrick};
+    /** Widget text size (dp) per font. */
+    public static final float[] WIDGET_DP = {14.5f, 19f, 16.5f};
     /** Editor text size per font, so they all look about the same size. */
     public static final float[] FONT_SP = {19f, 24f, 21.5f};
 
@@ -93,7 +94,7 @@ public final class NoteStore {
         b.items.add(new Item("Flick me up or down", false));
         b.items.add(new Item("Tap a line to strike it", true));
         b.items.add(new Item("Tap the title to edit", false));
-        b.items.add(new Item("+ makes a new note", false));
+        b.items.add(new Item("New notes: open the app", false));
         l.add(b);
         return l;
     }

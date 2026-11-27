@@ -67,7 +67,7 @@ class NoteTile extends View {
         tp.setTypeface(hand);
         tp.setTextSize(textSize);
         Paint rule = new Paint(Paint.ANTI_ALIAS_FLAG);
-        rule.setColor(0x2B8A6A2E);
+        rule.setColor(0x4D8A6A2E);
         rule.setStrokeWidth(dp(1));
         Paint strike = new Paint(Paint.ANTI_ALIAS_FLAG);
         strike.setStyle(Paint.Style.STROKE);
@@ -81,7 +81,7 @@ class NoteTile extends View {
             if (i < note.items.size()) {
                 NoteStore.Item it = note.items.get(i);
                 String s = TextUtils.ellipsize("– " + it.t, tp, right - x, TextUtils.TruncateAt.END).toString();
-                tp.setColor(it.d ? 0x992D57D6 : NoteStore.INK);
+                tp.setColor(it.d ? 0x991C44C4 : NoteStore.INK);
                 cv.drawText(s, x, base, tp);
                 if (it.d) {
                     float w = tp.measureText(s);

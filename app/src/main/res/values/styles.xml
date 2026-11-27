@@ -6,34 +6,7 @@
         <item name="android:navigationBarColor">@color/bg</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowLightNavigationBar">true</item>
-        <item name="android:colorAccent">#2D57D6</item>
-        <item name="android:textColorHighlight">#402D57D6</item>
-    </style>
-    <style name="Ink">
-        <item name="android:layout_width">wrap_content</item>
-        <item name="android:layout_height">match_parent</item>
-        <item name="android:button">@null</item>
-        <item name="android:background">@drawable/strike</item>
-        <item name="android:minHeight">0dp</item>
-        <item name="android:minWidth">0dp</item>
-        <item name="android:paddingStart">1dp</item>
-        <item name="android:paddingEnd">5dp</item>
-        <item name="android:gravity">center_vertical</item>
-        <item name="android:maxLines">1</item>
-        <item name="android:ellipsize">end</item>
-        <item name="android:includeFontPadding">false</item>
-        <item name="android:textColor">@color/ink</item>
-    </style>
-    <style name="Ink.Kalam">
-        <item name="android:fontFamily">@font/kalam</item>
-        <item name="android:textSize">14.5sp</item>
-    </style>
-    <style name="Ink.Caveat">
-        <item name="android:fontFamily">@font/caveat</item>
-        <item name="android:textSize">18.5sp</item>
-    </style>
-    <style name="Ink.Patrick">
-        <item name="android:fontFamily">@font/patrick</item>
-        <item name="android:textSize">16.5sp</item>
+        <item name="android:colorAccent">#1C44C4</item>
+        <item name="android:textColorHighlight">#401C44C4</item>
     </style>
 </resources>

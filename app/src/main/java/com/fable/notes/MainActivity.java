@@ -98,7 +98,7 @@ public class MainActivity extends Activity {
         int sel = NoteStore.font(this);
         for (int i = 0; i < NoteStore.FONT_NAMES.length; i++) {
             final int f = i;
-            TextView c = text(NoteStore.FONT_NAMES[i], i == 1 ? 21 : 17, i == sel ? 0xFF2449BE : 0xFF7A6A48, NoteStore.hand(this, i));
+            TextView c = text(NoteStore.FONT_NAMES[i], i == 1 ? 21 : 17, i == sel ? 0xFF16379E : 0xFF7A6A48, NoteStore.hand(this, i));
             c.setGravity(Gravity.CENTER);
             c.setIncludeFontPadding(false);
             c.setPadding(dp(16), dp(9), dp(16), dp(9));
