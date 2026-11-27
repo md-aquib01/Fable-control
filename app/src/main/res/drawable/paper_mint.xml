@@ -7,7 +7,7 @@
     <item android:left="6.2dp" android:right="6.2dp" android:top="7.0dp" android:bottom="4.8dp">
         <shape><corners android:radius="12dp"/><solid android:color="#173B2A10"/></shape></item>
     <item android:left="6dp" android:right="6dp" android:top="6dp" android:bottom="5.3dp">
-        <shape><corners android:radius="12dp"/><solid android:color="#BCD5B8"/></shape></item>
+        <shape><corners android:radius="12dp"/><solid android:color="#8ED3A2"/></shape></item>
     <item android:left="6dp" android:right="6dp" android:top="6dp" android:bottom="6dp">
-        <shape><corners android:radius="12dp"/><gradient android:angle="270" android:startColor="#E6F4E4" android:endColor="#DCEED9"/></shape></item>
+        <shape><corners android:radius="12dp"/><gradient android:angle="270" android:startColor="#D6F6DE" android:endColor="#BFEECB"/></shape></item>
 </layer-list>

@@ -36,18 +36,18 @@ public class MainActivity extends Activity {
         col.setPadding(dp(16), dp(18), dp(16), dp(40));
         sv.addView(col);
 
-        TextView kicker = text("FABLE", 13, 0xFFB8963A, head);
+        TextView kicker = text("FABLE", 13, 0xFFE0A21A, head);
         kicker.setLetterSpacing(0.28f);
         kicker.setPadding(dp(6), 0, 0, 0);
         col.addView(kicker);
-        TextView big = text("Notes", 40, 0xFF2A2620, head);
+        TextView big = text("Notes", 40, 0xFF2A2210, head);
         big.setPadding(dp(4), 0, 0, 0);
         col.addView(big);
-        TextView sub = text("Tap a line on the widget to strike it off. Tap the title for the next note.", 14.5f, 0xFF5A5448, null);
+        TextView sub = text("Tap a line on the widget to strike it off. Tap the title for the next note.", 14.5f, 0xFF5C4A22, null);
         sub.setPadding(dp(6), dp(2), dp(6), dp(16));
         col.addView(sub);
 
-        TextView hw = text("HANDWRITING", 11, 0xFF8A7E62, head);
+        TextView hw = text("HANDWRITING", 11, 0xFFB07A12, head);
         hw.setLetterSpacing(0.18f);
         hw.setPadding(dp(6), 0, 0, dp(8));
         col.addView(hw);
@@ -63,11 +63,11 @@ public class MainActivity extends Activity {
         col.addView(grid);
 
         TextView tip = text("Put it on your home screen: long-press an empty spot → Widgets → Fable Notes. Bigger sizes show more lines.",
-                13.5f, 0xFF5A5448, null);
+                13.5f, 0xFF5C4A22, null);
         GradientDrawable tg = new GradientDrawable();
         tg.setCornerRadius(dp(18));
-        tg.setColor(0xFFF7F0E1);
-        tg.setStroke(dp(1.5f), 0xFFE5CC7C);
+        tg.setColor(0xFFFFFFFF);
+        tg.setStroke(dp(1.5f), 0xFFF2C94C);
         tip.setBackground(tg);
         tip.setPadding(dp(16), dp(14), dp(16), dp(14));
         LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(-1, -2);
@@ -137,9 +137,9 @@ public class MainActivity extends Activity {
             c.setIncludeFontPadding(false);
             c.setPadding(dp(16), dp(9), dp(16), dp(9));
             GradientDrawable g = new GradientDrawable();
-            g.setColor(i == sel ? NoteStore.INK : 0xFFF7F0E1);
+            g.setColor(i == sel ? NoteStore.INK : 0xFFFFFFFF);
             g.setCornerRadius(dp(22));
-            g.setStroke(dp(1.5f), i == sel ? NoteStore.INK : 0xFFE0D3B4);
+            g.setStroke(dp(1.5f), i == sel ? NoteStore.INK : 0xFFF2C94C);
             c.setBackground(g);
             c.setElevation(i == sel ? dp(3) : 0);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);

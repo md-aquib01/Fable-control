@@ -19,12 +19,12 @@ public final class NoteStore {
     public static final String[] PAPER_NAMES = {"Cream", "Mint", "Blush", "Sky", "Lilac", "Lemon"};
     public static final int[] PAPER_RES = {R.drawable.paper_cream, R.drawable.paper_mint,
             R.drawable.paper_blush, R.drawable.paper_sky, R.drawable.paper_lilac, R.drawable.paper_lemon};
-    public static final int[] PAPER_TOP = {0xFFF7F0E1, 0xFFE6F4E4, 0xFFFBE5E1, 0xFFE1ECFA, 0xFFECE5F8, 0xFFFAF1CC};
-    public static final int[] PAPER_BOTTOM = {0xFFF3EAD8, 0xFFDCEED9, 0xFFF6DAD5, 0xFFD6E4F6, 0xFFE3DAF3, 0xFFF5E9BA};
-    public static final int[] PAPER_RIM = {0xFFDCD1BC, 0xFFBCD5B8, 0xFFE0BDB6, 0xFFB6C8E2, 0xFFC9BCE2, 0xFFDDCF9C};
-    public static final int[] TITLE = {0xFFC2B68A, 0xFF8DB088, 0xFFC99A92, 0xFF8EA6C9, 0xFFA596C6, 0xFFBFAE6E};
-    public static final int INK = 0xFF3B5BD6;
-    public static final int INK_DARK = 0xFF3B5BD6;
+    public static final int[] PAPER_TOP = {0xFFFFF3CF, 0xFFD6F6DE, 0xFFFFDCE1, 0xFFD6E8FF, 0xFFE8DCFF, 0xFFFFF8BE};
+    public static final int[] PAPER_BOTTOM = {0xFFFFE8AE, 0xFFBFEECB, 0xFFFFC8D0, 0xFFBFD9FF, 0xFFD8C8FF, 0xFFFFF08F};
+    public static final int[] PAPER_RIM = {0xFFE8CB80, 0xFF8ED3A2, 0xFFEFA0AE, 0xFF8DB6F0, 0xFFB29CF0, 0xFFE3CF55};
+    public static final int[] TITLE = {0xFFB8862A, 0xFF2F9350, 0xFFD24A62, 0xFF2F6FD6, 0xFF7350DA, 0xFF9C8510};
+    public static final int INK = 0xFF2F55E0;
+    public static final int INK_DARK = 0xFF2347C8;
 
     public static final String[] FONT_NAMES = {"Kaushan", "Kalam", "Caveat", "Patrick Hand"};
     public static final int[] FONT_RES = {R.font.kaushan, R.font.kalam, R.font.caveat, R.font.patrick};

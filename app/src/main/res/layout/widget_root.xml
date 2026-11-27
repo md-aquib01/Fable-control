@@ -8,5 +8,5 @@
         android:inAnimation="@animator/note_in" android:outAnimation="@animator/note_out"/>
     <TextView android:id="@+id/empty" android:layout_width="207dp" android:layout_height="207dp" android:layout_gravity="center"
         android:rotation="-7.4" android:background="@drawable/paper_cream" android:gravity="center" android:padding="24dp"
-        android:textSize="15sp" android:textColor="#3B5BD6" android:text="Open Fable Notes to write a note"/>
+        android:textSize="15sp" android:textColor="#2F55E0" android:text="Open Fable Notes to write a note"/>
 </FrameLayout>

@@ -101,7 +101,7 @@ class NoteTile extends View {
         tp.setTextSize(rowH * NoteStore.WIDGET_K[font]);
         tp.setColor(NoteStore.INK);
         Paint rule = new Paint(Paint.ANTI_ALIAS_FLAG);
-        rule.setColor(0xFFE9E0CB);
+        rule.setColor(0x552F55E0);
         rule.setStrokeWidth(Math.max(1f, f * 0.004f));
         Paint strike = new Paint(Paint.ANTI_ALIAS_FLAG);
         strike.setStyle(Paint.Style.STROKE);
