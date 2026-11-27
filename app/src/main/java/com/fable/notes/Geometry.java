@@ -33,7 +33,7 @@ final class Geometry {
         g.margin = g.paper * 0.04f;
         g.rowH = Math.max(15f, g.paper * ROW);
         g.titleTop = g.paper * 0.095f;
-        g.titleSize = g.paper * 0.056f;
+        g.titleSize = g.paper * 0.064f;
         g.titleH = g.titleSize * 1.5f;
         g.titleGap = g.paper * 0.05f;
         g.indent = g.paper * 0.09f;

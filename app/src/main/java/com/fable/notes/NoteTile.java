@@ -86,17 +86,17 @@ class NoteTile extends View {
 
         TextPaint tt = new TextPaint(Paint.ANTI_ALIAS_FLAG);
         tt.setTypeface(title);
-        tt.setTextSize(f * 0.056f);
+        tt.setTextSize(f * 0.064f);
         tt.setLetterSpacing(0.04f);
         tt.setColor(NoteStore.TITLE[col]);
         String t = note.title == null || note.title.trim().isEmpty() ? "NOTE" : note.title.trim().toUpperCase();
         float maxW = f - indent - f * 0.07f;
         float titleTop = top + f * 0.095f;
         cv.drawText(TextUtils.ellipsize(t, tt, maxW, TextUtils.TruncateAt.END).toString(), left + indent,
-                titleTop + f * 0.056f * 1.1f, tt);
+                titleTop + f * 0.064f * 1.1f, tt);
 
         float rowH = f * Geometry.ROW;
-        float y = titleTop + f * 0.056f * 1.5f + f * 0.05f;
+        float y = titleTop + f * 0.064f * 1.5f + f * 0.05f;
         TextPaint tp = new TextPaint(Paint.ANTI_ALIAS_FLAG);
         tp.setTypeface(hand);
         tp.setTextSize(rowH * NoteStore.WIDGET_K[font]);
