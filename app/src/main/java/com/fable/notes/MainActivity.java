@@ -19,6 +19,7 @@ public class MainActivity extends Activity {
     private LinearLayout grid, chips;
     private Typeface head;
     private boolean firstShow = true;
+    private TextView check;
 
     private int dp(float v) { return Ui.dpi(this, v); }
 
@@ -35,18 +36,18 @@ public class MainActivity extends Activity {
         col.setPadding(dp(16), dp(18), dp(16), dp(40));
         sv.addView(col);
 
-        TextView kicker = text("FABLE", 13, 0xFFC99A2C, head);
+        TextView kicker = text("FABLE", 13, 0xFF9A6A0E, head);
         kicker.setLetterSpacing(0.28f);
         kicker.setPadding(dp(6), 0, 0, 0);
         col.addView(kicker);
-        TextView big = text("Notes", 40, 0xFF3A2E18, head);
+        TextView big = text("Notes", 40, 0xFF2B2111, head);
         big.setPadding(dp(4), 0, 0, 0);
         col.addView(big);
-        TextView sub = text("Flick notes on the widget. Tap a line to strike it off.", 14.5f, 0xFF8C7A55, null);
+        TextView sub = text("Flick notes up or down on the widget. Tap a line to strike it off.", 14.5f, 0xFF4F4128, null);
         sub.setPadding(dp(6), dp(2), dp(6), dp(16));
         col.addView(sub);
 
-        TextView hw = text("HANDWRITING", 11, 0xFFB09455, head);
+        TextView hw = text("HANDWRITING", 11, 0xFF6E5520, head);
         hw.setLetterSpacing(0.18f);
         hw.setPadding(dp(6), 0, 0, dp(8));
         col.addView(hw);
@@ -62,10 +63,11 @@ public class MainActivity extends Activity {
         col.addView(grid);
 
         TextView tip = text("Put it on your home screen: long-press an empty spot → Widgets → Fable Notes. 3×3 shows the most lines.",
-                13.5f, 0xFF8C7A55, null);
+                13.5f, 0xFF4F4128, null);
         GradientDrawable tg = new GradientDrawable();
         tg.setCornerRadius(dp(18));
-        tg.setColor(0x66F4D47B);
+        tg.setColor(0xFFFFFDF7);
+        tg.setStroke(dp(1.5f), 0xFFD9C79A);
         tip.setBackground(tg);
         tip.setPadding(dp(16), dp(14), dp(16), dp(14));
         LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(-1, -2);
@@ -73,6 +75,11 @@ public class MainActivity extends Activity {
         tlp.leftMargin = dp(6);
         tlp.rightMargin = dp(6);
         col.addView(tip, tlp);
+
+        check = text("", 12, 0xFFB3261E, null);
+        check.setPadding(dp(6), dp(12), dp(6), 0);
+        check.setVisibility(View.GONE);
+        col.addView(check);
 
         setContentView(sv);
     }
@@ -82,6 +89,26 @@ public class MainActivity extends Activity {
         super.onResume();
         buildGrid();
         firstShow = false;
+        selfCheck();
+    }
+
+    /** Builds a widget card exactly like the widget does and reports any error. */
+    private void selfCheck() {
+        String err = null;
+        try {
+            NotesWidgetService.Factory f = new NotesWidgetService.Factory(getApplicationContext(),
+                    android.appwidget.AppWidgetManager.INVALID_APPWIDGET_ID);
+            f.onCreate();
+            if (f.getCount() > 0) {
+                android.widget.RemoteViews rv = f.build(0);
+                android.widget.FrameLayout holder = new android.widget.FrameLayout(this);
+                rv.apply(this, holder);
+            }
+        } catch (Throwable t) {
+            err = "Widget check: " + t;
+        }
+        check.setText(err == null ? "" : err);
+        check.setVisibility(err == null ? View.GONE : View.VISIBLE);
     }
 
     private TextView text(String s, float sp, int color, Typeface tf) {
@@ -98,14 +125,14 @@ public class MainActivity extends Activity {
         int sel = NoteStore.font(this);
         for (int i = 0; i < NoteStore.FONT_NAMES.length; i++) {
             final int f = i;
-            TextView c = text(NoteStore.FONT_NAMES[i], i == 1 ? 21 : 17, i == sel ? 0xFF16379E : 0xFF7A6A48, NoteStore.hand(this, i));
+            TextView c = text(NoteStore.FONT_NAMES[i], i == 1 ? 21 : 17, i == sel ? 0xFFFFFFFF : 0xFF3E321A, NoteStore.hand(this, i));
             c.setGravity(Gravity.CENTER);
             c.setIncludeFontPadding(false);
             c.setPadding(dp(16), dp(9), dp(16), dp(9));
-            GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                    i == sel ? new int[]{0xFFFCE7A2, 0xFFEBC35B} : new int[]{0xFFFBF3DE, 0xFFF1E5C6});
+            GradientDrawable g = new GradientDrawable();
+            g.setColor(i == sel ? NoteStore.INK : 0xFFFFFDF7);
             g.setCornerRadius(dp(22));
-            g.setStroke(dp(1), i == sel ? 0xFFD6A637 : 0xFFE6D8B4);
+            g.setStroke(dp(1.5f), i == sel ? NoteStore.INK_DARK : 0xFFCDB884);
             c.setBackground(g);
             c.setElevation(i == sel ? dp(3) : 0);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);

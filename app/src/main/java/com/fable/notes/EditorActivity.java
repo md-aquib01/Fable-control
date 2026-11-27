@@ -4,9 +4,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.graphics.Canvas;
-import android.graphics.LinearGradient;
 import android.graphics.Paint;
-import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
@@ -119,7 +117,7 @@ public class EditorActivity extends Activity implements InkRow.Host {
         more.setText("+  add a line");
         more.setTypeface(hand);
         more.setTextSize(sp * 0.85f);
-        more.setTextColor(0x881C44C4);
+        more.setTextColor(0xB31A3FB8);
         more.setPadding(dp(10), dp(10), dp(10), dp(4));
         more.setOnClickListener(v -> {
             InkRow r = addRow(rows.getChildCount(), "", false, true);
@@ -212,7 +210,7 @@ public class EditorActivity extends Activity implements InkRow.Host {
     private void tintTitle() {
         int t = NoteStore.TITLE[note.color];
         title.setTextColor(t);
-        title.setHintTextColor((t & 0x00FFFFFF) | 0x77000000);
+        title.setHintTextColor((t & 0x00FFFFFF) | 0x99000000);
         GradientDrawable cursor = new GradientDrawable();
         cursor.setColor(t);
         cursor.setSize(dp(2), dp(24));
@@ -286,11 +284,12 @@ public class EditorActivity extends Activity implements InkRow.Host {
             float r = Math.min(cx, cy) - Ui.dp(getContext(), sel ? 5 : 6);
             p.setShader(null);
             p.setStyle(Paint.Style.FILL);
+            p.setColor(0x332E1C00);
+            cv.drawCircle(cx, cy + Ui.dp(getContext(), 2f), r, p);
             p.setColor(NoteStore.PAPER_RIM[c]);
-            cv.drawCircle(cx, cy + Ui.dp(getContext(), 1.5f), r, p);
-            p.setShader(new LinearGradient(0, cy - r, 0, cy + r, NoteStore.PAPER_TOP[c], NoteStore.PAPER_BOTTOM[c], Shader.TileMode.CLAMP));
             cv.drawCircle(cx, cy, r, p);
-            p.setShader(null);
+            p.setColor(NoteStore.PAPER_BOTTOM[c]);
+            cv.drawCircle(cx, cy - Ui.dp(getContext(), 1f), r - Ui.dp(getContext(), 3f), p);
             if (sel) {
                 p.setStyle(Paint.Style.STROKE);
                 p.setStrokeWidth(Ui.dp(getContext(), 2));

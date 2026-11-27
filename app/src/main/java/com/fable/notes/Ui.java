@@ -7,7 +7,6 @@ import android.graphics.Canvas;
 import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Path;
-import android.graphics.RadialGradient;
 import android.graphics.RectF;
 import android.graphics.Shader;
 import android.view.MotionEvent;
@@ -29,26 +28,20 @@ final class Ui {
         p.reset();
         p.setAntiAlias(true);
         p.setStyle(Paint.Style.FILL);
-        // soft shadow
-        p.setColor(0x14946A12);
-        cv.drawRoundRect(r.left + lift * 0.4f, r.top + lift * 1.6f, r.right - lift * 0.4f, r.bottom + lift * 1.6f, rad, rad, p);
-        p.setColor(0x1F946A12);
-        cv.drawRoundRect(r.left, r.top + lift, r.right, r.bottom + lift, rad, rad, p);
-        // rim
+        // shadow
+        p.setColor(0x2E3A2600);
+        cv.drawRoundRect(r.left + lift * 0.3f, r.top + lift * 1.4f, r.right - lift * 0.3f, r.bottom + lift * 1.4f, rad, rad, p);
+        // rim (the paper's thickness)
         p.setColor(rim);
-        cv.drawRoundRect(r.left, r.top + lift * 0.6f, r.right, r.bottom + lift * 0.6f, rad, rad, p);
+        cv.drawRoundRect(r.left, r.top + lift * 0.7f, r.right, r.bottom + lift * 0.7f, rad, rad, p);
         // face
         p.setShader(new LinearGradient(0, r.top, 0, r.bottom, top, bottom, Shader.TileMode.CLAMP));
         cv.drawRoundRect(r, rad, rad, p);
-        // gloss
-        p.setShader(new RadialGradient(r.left + r.width() * 0.2f, r.top + r.height() * 0.04f,
-                Math.max(r.width(), r.height()) * 0.9f, 0x80FFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP));
-        cv.drawRoundRect(r, rad, rad, p);
         p.setShader(null);
-        // highlight edge
+        // thin top highlight
         p.setStyle(Paint.Style.STROKE);
-        p.setStrokeWidth(Math.max(1f, lift * 0.3f));
-        p.setColor(0xB3FFFFFF);
+        p.setStrokeWidth(Math.max(1f, lift * 0.25f));
+        p.setColor(0x99FFFFFF);
         cv.drawRoundRect(r, rad, rad, p);
         p.setStyle(Paint.Style.FILL);
     }

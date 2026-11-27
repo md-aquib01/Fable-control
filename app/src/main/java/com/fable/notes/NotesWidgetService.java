@@ -8,7 +8,6 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.Typeface;
-import android.os.Bundle;
 import android.text.TextPaint;
 import android.text.TextUtils;
 import android.util.TypedValue;
@@ -42,6 +41,7 @@ public class NotesWidgetService extends RemoteViewsService {
         private final int wid;
         private List<NoteStore.Note> notes = new ArrayList<>();
         private float cardW = 220, cardH = 220;
+        private String lastError;
 
         Factory(Context c, int wid) { this.c = c; this.wid = wid; }
 
@@ -56,23 +56,26 @@ public class NotesWidgetService extends RemoteViewsService {
 
         private void load() {
             notes = NoteStore.all(c);
-            // Work out the real card size so pages fill the widget at any size.
-            float w = 250, h = 250;
-            if (wid != AppWidgetManager.INVALID_APPWIDGET_ID) {
-                Bundle o = AppWidgetManager.getInstance(c).getAppWidgetOptions(wid);
-                int minW = o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH);
-                int maxH = o.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT);
-                if (minW > 0) w = minW;   // portrait: width = min width
-                if (maxH > 0) h = maxH;   // portrait: height = max height
-            }
-            float stackW = w - 24, stackH = h - 28;            // widget padding
-            float frame = 8;                                    // StackView frames each card with 4dp padding
-            cardW = Math.max(90, stackW * 0.9f - frame - 2);   // StackView gives each card 90%
-            cardH = Math.max(90, stackH * 0.9f - frame - 2);
+            Geometry g = Geometry.of(c, wid);
+            cardW = g.cardW;
+            cardH = g.cardH;
         }
 
         @Override
         public RemoteViews getViewAt(int pos) {
+            try {
+                return build(pos);
+            } catch (Throwable t) {
+                // never leave a blank widget: show a plain card with the error
+                RemoteViews rv = new RemoteViews(c.getPackageName(), R.layout.card);
+                rv.setViewVisibility(R.id.err, View.VISIBLE);
+                rv.setTextViewText(R.id.err, "Widget error: " + t);
+                for (int r : ROW) rv.setViewVisibility(r, View.GONE);
+                return rv;
+            }
+        }
+
+        RemoteViews build(int pos) {
             RemoteViews rv = new RemoteViews(c.getPackageName(), R.layout.card);
             if (pos >= notes.size()) return rv;
             NoteStore.Note n = notes.get(pos);
@@ -87,9 +90,8 @@ public class NotesWidgetService extends RemoteViewsService {
 
             float textW = cardW - PAD_L - PAD_R - 4;
             String title = n.title == null || n.title.trim().isEmpty() ? "NOTE" : n.title.trim().toUpperCase();
-            Line tl = render(title, NoteStore.heading(c), 10.5f, 0.12f, textW, TITLE_DP, d, dpi);
+            Line tl = renderColor(title, NoteStore.heading(c), 10.5f, 0.12f, textW, TITLE_DP, d, dpi, NoteStore.TITLE[n.color]);
             rv.setImageViewBitmap(R.id.title, tl.bmp);
-            rv.setInt(R.id.title, "setColorFilter", NoteStore.TITLE[n.color]);
 
             Intent open = new Intent().putExtra("op", "open").putExtra("id", n.id);
             rv.setOnClickFillInIntent(R.id.card, open);
@@ -106,7 +108,6 @@ public class NotesWidgetService extends RemoteViewsService {
                     Line l = render("– " + it.t, hand, NoteStore.WIDGET_DP[font], 0f, textW - 6, ROW_DP, d, dpi);
                     rv.setViewVisibility(TXT[i], View.VISIBLE);
                     rv.setImageViewBitmap(TXT[i], l.bmp);
-                    rv.setInt(TXT[i], "setColorFilter", NoteStore.INK);
                     rv.setViewVisibility(CHK[i], View.VISIBLE);
                     rv.setViewLayoutWidth(CHK[i], l.widthDp + 5, TypedValue.COMPLEX_UNIT_DIP);
                     rv.setCompoundButtonChecked(CHK[i], it.d);
@@ -121,6 +122,18 @@ public class NotesWidgetService extends RemoteViewsService {
         }
 
         static final class Line { Bitmap bmp; float widthDp; }
+
+        /** Small full-colour text bitmap (used for the title). */
+        static Line renderColor(String s, Typeface tf, float sizeDp, float spacing, float maxWDp, float hDp, float d, int dpi, int color) {
+            Line a = render(s, tf, sizeDp, spacing, maxWDp, hDp, d, dpi);
+            Bitmap b = Bitmap.createBitmap(a.bmp.getWidth(), a.bmp.getHeight(), Bitmap.Config.ARGB_8888);
+            Paint p = new Paint();
+            p.setColor(color);
+            new Canvas(b).drawBitmap(a.bmp, 0, 0, p);
+            b.setDensity(dpi);
+            a.bmp = b;
+            return a;
+        }
 
         /** Draws one line of handwriting into a small alpha-only bitmap (tinted by the widget). */
         static Line render(String s, Typeface tf, float sizeDp, float spacing, float maxWDp, float hDp, float d, int dpi) {

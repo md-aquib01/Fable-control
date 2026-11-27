@@ -9,6 +9,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.TypedValue;
 import android.widget.RemoteViews;
 
 public class NotesWidget extends AppWidgetProvider {
@@ -22,6 +23,7 @@ public class NotesWidget extends AppWidgetProvider {
     @Override
     public void onAppWidgetOptionsChanged(Context c, AppWidgetManager m, int id, Bundle o) {
         // widget was resized: redraw the cards at the new size
+        m.updateAppWidget(id, build(c, id));
         m.notifyAppWidgetViewDataChanged(id, R.id.stack);
     }
 
@@ -33,6 +35,13 @@ public class NotesWidget extends AppWidgetProvider {
         svc.setData(Uri.parse(svc.toUri(Intent.URI_INTENT_SCHEME)));
         rv.setRemoteAdapter(R.id.stack, svc);
         rv.setEmptyView(R.id.stack, R.id.empty);
+
+        Geometry g = Geometry.of(c, wid);
+        int dip = TypedValue.COMPLEX_UNIT_DIP;
+        rv.setViewLayoutWidth(R.id.stack, g.stackW, dip);
+        rv.setViewLayoutHeight(R.id.stack, g.stackH, dip);
+        rv.setViewLayoutMargin(R.id.stack, RemoteViews.MARGIN_START, g.stackLeft, dip);
+        rv.setViewLayoutMargin(R.id.stack, RemoteViews.MARGIN_TOP, g.stackTop, dip);
 
         Intent tpl = new Intent(c, NotesWidget.class).setAction(ACT_ITEM);
         rv.setPendingIntentTemplate(R.id.stack, PendingIntent.getBroadcast(c, 0, tpl,

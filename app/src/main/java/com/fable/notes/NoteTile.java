@@ -3,12 +3,9 @@ package com.fable.notes;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.DashPathEffect;
-import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Path;
-import android.graphics.RadialGradient;
 import android.graphics.RectF;
-import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.text.TextUtils;
 import android.view.View;
@@ -67,7 +64,7 @@ class NoteTile extends View {
         tp.setTypeface(hand);
         tp.setTextSize(textSize);
         Paint rule = new Paint(Paint.ANTI_ALIAS_FLAG);
-        rule.setColor(0x4D8A6A2E);
+        rule.setColor(0x477A6030);
         rule.setStrokeWidth(dp(1));
         Paint strike = new Paint(Paint.ANTI_ALIAS_FLAG);
         strike.setStyle(Paint.Style.STROKE);
@@ -81,7 +78,7 @@ class NoteTile extends View {
             if (i < note.items.size()) {
                 NoteStore.Item it = note.items.get(i);
                 String s = TextUtils.ellipsize("– " + it.t, tp, right - x, TextUtils.TruncateAt.END).toString();
-                tp.setColor(it.d ? 0x991C44C4 : NoteStore.INK);
+                tp.setColor(it.d ? 0x801A3FB8 : NoteStore.INK);
                 cv.drawText(s, x, base, tp);
                 if (it.d) {
                     float w = tp.measureText(s);
@@ -98,26 +95,23 @@ class NoteTile extends View {
         p.reset();
         p.setAntiAlias(true);
         p.setStyle(Paint.Style.FILL);
-        p.setColor(0x33F4D47B);
+        p.setColor(0x80FFFDF7);
         cv.drawRoundRect(r, rad, rad, p);
         p.setStyle(Paint.Style.STROKE);
         p.setStrokeWidth(dp(2));
-        p.setColor(0x99D6A637);
+        p.setColor(0xFFB08A3E);
         p.setPathEffect(new DashPathEffect(new float[]{dp(7), dp(6)}, 0));
         cv.drawRoundRect(r, rad, rad, p);
         p.setPathEffect(null);
 
         float cx = r.centerX(), cy = r.centerY() - dp(10), br = dp(24);
         p.setStyle(Paint.Style.FILL);
-        p.setColor(0x40274BB8);
+        p.setColor(0x332E1C00);
         cv.drawCircle(cx, cy + dp(4), br, p);
-        p.setColor(0xFF2447B5);
-        cv.drawCircle(cx, cy + dp(2), br, p);
-        p.setShader(new LinearGradient(0, cy - br, 0, cy + br, 0xFF7097FF, 0xFF3762E0, Shader.TileMode.CLAMP));
+        p.setColor(NoteStore.INK_DARK);
+        cv.drawCircle(cx, cy + dp(2.5f), br, p);
+        p.setColor(NoteStore.INK);
         cv.drawCircle(cx, cy, br, p);
-        p.setShader(new RadialGradient(cx - br * 0.35f, cy - br * 0.6f, br * 1.2f, 0x80FFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP));
-        cv.drawCircle(cx, cy, br, p);
-        p.setShader(null);
         p.setStyle(Paint.Style.STROKE);
         p.setStrokeCap(Paint.Cap.ROUND);
         p.setStrokeWidth(dp(3.2f));
@@ -131,7 +125,7 @@ class NoteTile extends View {
         p.setAntiAlias(true);
         p.setTypeface(head);
         p.setTextSize(dp(14));
-        p.setColor(0xFF9A7B33);
+        p.setColor(0xFF5E4718);
         p.setTextAlign(Paint.Align.CENTER);
         cv.drawText("New note", cx, cy + br + dp(26), p);
     }
