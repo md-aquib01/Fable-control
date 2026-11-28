@@ -123,8 +123,7 @@ public class MainActivity extends Activity {
             buildGrid();
             quiet = false;
         };
-        Sync.schedule(this);
-        Sync.soon(this);
+        try { Sync.schedule(this); Sync.soon(this); } catch (Throwable ignored) {}
     }
 
     @Override
@@ -160,8 +159,14 @@ public class MainActivity extends Activity {
                 .setTitle("Sync with computer")
                 .setView(box)
                 .setPositiveButton("Save", (d, w) -> {
-                    Sync.setToken(this, in.getText().toString());
+                    String t = in.getText().toString();
+                    try { Sync.setToken(this, t); } catch (Throwable e) {
+                        android.widget.Toast.makeText(this, "Couldn't save: " + e, android.widget.Toast.LENGTH_LONG).show();
+                        return;
+                    }
                     syncStatus.setText(Sync.status(this));
+                    android.widget.Toast.makeText(this, t.trim().isEmpty() ? "No token pasted" : "Saved — syncing…",
+                            android.widget.Toast.LENGTH_SHORT).show();
                 })
                 .setNegativeButton("Cancel", null);
         if (Sync.on(this)) b.setNeutralButton("Disconnect", (d, w) -> {

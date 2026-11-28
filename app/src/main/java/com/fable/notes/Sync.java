@@ -49,8 +49,9 @@ public final class Sync {
     }
 
     public static void setToken(Context c, String t) {
-        sp(c).edit().putString("token", t == null ? "" : t.trim()).remove("gist").remove("status").apply();
-        schedule(c);
+        String clean = t == null ? "" : t.replaceAll("\\s+", "");
+        sp(c).edit().putString("token", clean).remove("gist").remove("status").commit();   // written to disk right away
+        try { schedule(c); } catch (Throwable ignored) {}
         soon(c);
     }
 
@@ -64,7 +65,9 @@ public final class Sync {
         }
         new Thread(() -> {
             while (true) {
-                run(app);
+                try { run(app); } catch (Throwable t) {
+                    sp(app).edit().putString("status", "Couldn't sync: " + t).apply();
+                }
                 synchronized (LOCK) {
                     if (!again) { running = false; break; }
                     again = false;
@@ -201,6 +204,10 @@ public final class Sync {
 
     /** Background sync every ~15 minutes while connected. */
     public static void schedule(Context c) {
+        try { scheduleJob(c); } catch (Throwable ignored) {}   // background sync is a bonus; never let it break saving
+    }
+
+    private static void scheduleJob(Context c) {
         JobScheduler js = c.getSystemService(JobScheduler.class);
         if (js == null) return;
         if (!on(c)) { js.cancel(42); return; }
