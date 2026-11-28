@@ -111,6 +111,7 @@ public final class Sync {
             rFont = root.optInt("font", -1); rFu = root.optLong("fontUpdated", 0);
         } catch (Exception ignored) {}
         int lFont = NoteStore.font(c); long lFu = NoteStore.fontUpdated(c);
+        if (lFu == 0 && lFont != 0) lFu = 1;   // picked before fonts synced: the phone's choice wins over the computer's default
         int font = lFont; long fu = lFu;
         if (rFont >= 0 && rFont < NoteStore.FONT_RES.length && rFu > lFu) { font = rFont; fu = rFu; }
 
