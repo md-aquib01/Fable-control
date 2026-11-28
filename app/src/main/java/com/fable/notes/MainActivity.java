@@ -19,7 +19,9 @@ public class MainActivity extends Activity {
     private LinearLayout grid, chips;
     private Typeface head;
     private boolean firstShow = true;
-    private TextView check;
+    private TextView check, syncStatus;
+    private LinearLayout syncCard;
+    private boolean quiet;
 
     private int dp(float v) { return Ui.dpi(this, v); }
 
@@ -76,6 +78,29 @@ public class MainActivity extends Activity {
         tlp.rightMargin = dp(6);
         col.addView(tip, tlp);
 
+        // sync with the computer (GitHub Gist)
+        syncCard = new LinearLayout(this);
+        syncCard.setOrientation(LinearLayout.VERTICAL);
+        syncCard.setPadding(dp(16), dp(14), dp(16), dp(14));
+        GradientDrawable sg = new GradientDrawable();
+        sg.setCornerRadius(dp(18));
+        sg.setColor(0xFFFFFFFF);
+        sg.setStroke(dp(1.5f), 0xFF8DB6F0);
+        syncCard.setBackground(sg);
+        TextView sh = text("SYNC WITH COMPUTER", 11, 0xFF2F6FD6, head);
+        sh.setLetterSpacing(0.18f);
+        syncCard.addView(sh);
+        syncStatus = text("", 13.5f, 0xFF4F4128, null);
+        syncStatus.setPadding(0, dp(4), 0, 0);
+        syncCard.addView(syncStatus);
+        LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(-1, -2);
+        slp.topMargin = dp(12);
+        slp.leftMargin = dp(6);
+        slp.rightMargin = dp(6);
+        col.addView(syncCard, slp);
+        Ui.squish(syncCard);
+        syncCard.setOnClickListener(v -> syncDialog());
+
         check = text("", 12, 0xFFB3261E, null);
         check.setPadding(dp(6), dp(12), dp(6), 0);
         check.setTextIsSelectable(true);
@@ -91,6 +116,59 @@ public class MainActivity extends Activity {
         buildGrid();
         firstShow = false;
         selfCheck();
+        syncStatus.setText(Sync.status(this));
+        Sync.listener = () -> {
+            syncStatus.setText(Sync.status(this));
+            quiet = true;
+            buildGrid();
+            quiet = false;
+        };
+        Sync.schedule(this);
+        Sync.soon(this);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        Sync.listener = null;
+    }
+
+    private void syncDialog() {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(22), dp(8), dp(22), 0);
+        TextView info = text("Your notes are kept in one private GitHub Gist, so Fable Thin Bar on your computer shows the same notes.\n\n"
+                + "1. Tap \"Create token\", sign in to GitHub, scroll down and press Generate token (only the \"gist\" box needs to be ticked).\n"
+                + "2. Copy the token, paste it below, and paste the same token in Fable Thin Bar.", 14, 0xFF4F4128, null);
+        box.addView(info);
+        android.widget.EditText in = new android.widget.EditText(this);
+        in.setHint("Paste GitHub token");
+        in.setSingleLine(true);
+        in.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
+        in.setText(Sync.token(this));
+        box.addView(in);
+        TextView link = text("Create token →", 15, NoteStore.INK, head);
+        link.setPadding(0, dp(10), 0, dp(4));
+        link.setOnClickListener(v -> {
+            try {
+                startActivity(new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(
+                        "https://github.com/settings/tokens/new?scopes=gist&description=Fable%20Notes")));
+            } catch (Exception ignored) {}
+        });
+        box.addView(link);
+        android.app.AlertDialog.Builder b = new android.app.AlertDialog.Builder(this, android.R.style.Theme_Material_Light_Dialog_Alert)
+                .setTitle("Sync with computer")
+                .setView(box)
+                .setPositiveButton("Save", (d, w) -> {
+                    Sync.setToken(this, in.getText().toString());
+                    syncStatus.setText(Sync.status(this));
+                })
+                .setNegativeButton("Cancel", null);
+        if (Sync.on(this)) b.setNeutralButton("Disconnect", (d, w) -> {
+            Sync.setToken(this, "");
+            syncStatus.setText(Sync.status(this));
+        });
+        b.show();
     }
 
     /** Builds a widget card exactly like the widget does and reports any error. */
@@ -187,6 +265,7 @@ public class MainActivity extends Activity {
                 overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
             });
             // pop in, one after another
+            if (quiet) continue;
             tile.setAlpha(0f);
             tile.setScaleX(0.82f);
             tile.setScaleY(0.82f);

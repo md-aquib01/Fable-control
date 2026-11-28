@@ -44,29 +44,49 @@ public final class NoteStore {
         public String title = "";
         public int color;
         public List<Item> items = new ArrayList<>();
+        /** Last change (ms since 1970) and deletion marker, used to merge with the computer. */
+        public long updated;
+        public boolean deleted;
     }
 
     private static SharedPreferences sp(Context c) {
         return c.getSharedPreferences("notes", Context.MODE_PRIVATE);
     }
 
+    /** Visible notes, newest first. */
     public static synchronized List<Note> all(Context c) {
-        SharedPreferences p = sp(c);
-        String raw = p.getString("list", null);
         List<Note> out = new ArrayList<>();
-        if (raw == null) {
-            out = seed();
-            saveAll(c, out);
-            return out;
+        for (Note n : raw(c)) if (!n.deleted) out.add(n);
+        out.sort((x, y) -> Long.compare(y.id, x.id));
+        return out;
+    }
+
+    /** Every note including deleted markers (for sync). */
+    public static synchronized List<Note> raw(Context c) {
+        String s = sp(c).getString("list", null);
+        if (s == null) {
+            List<Note> seeded = seed();
+            saveRaw(c, seeded);
+            return seeded;
         }
+        return parseList(s);
+    }
+
+    /** Accepts either a bare array or {"notes":[...]}. */
+    public static List<Note> parseList(String s) {
+        List<Note> out = new ArrayList<>();
         try {
-            JSONArray arr = new JSONArray(raw);
+            String t = s.trim();
+            JSONArray arr = t.startsWith("{") ? new JSONObject(t).optJSONArray("notes") : new JSONArray(t);
+            if (arr == null) return out;
             for (int i = 0; i < arr.length(); i++) {
                 JSONObject o = arr.getJSONObject(i);
                 Note n = new Note();
                 n.id = o.optLong("id");
                 n.title = o.optString("title", "");
                 n.color = Math.max(0, Math.min(PAPER_RES.length - 1, o.optInt("color", 0)));
+                n.updated = o.optLong("updated", 0);
+                n.deleted = o.optBoolean("deleted", false);
                 JSONArray it = o.optJSONArray("items");
                 if (it != null) for (int j = 0; j < it.length(); j++) {
                     JSONObject x = it.getJSONObject(j);
@@ -76,6 +96,38 @@ public final class NoteStore {
             }
         } catch (Exception ignored) {}
         return out;
+    }
+
+    /** Stable JSON (sorted by id) shared with the computer. */
+    public static String toJson(List<Note> list) {
+        List<Note> l = new ArrayList<>(list);
+        l.sort((x, y) -> Long.compare(x.id, y.id));
+        JSONArray arr = new JSONArray();
+        try {
+            for (Note n : l) {
+                JSONObject o = new JSONObject();
+                o.put("id", n.id);
+                o.put("title", n.title == null ? "" : n.title);
+                o.put("color", n.color);
+                o.put("updated", n.updated);
+                o.put("deleted", n.deleted);
+                JSONArray it = new JSONArray();
+                for (Item x : n.items) {
+                    JSONObject j = new JSONObject();
+                    j.put("t", x.t == null ? "" : x.t);
+                    j.put("d", x.d);
+                    it.put(j);
+                }
+                o.put("items", it);
+                arr.put(o);
+            }
+            JSONObject root = new JSONObject();
+            root.put("v", 1);
+            root.put("notes", arr);
+            return root.toString();
+        } catch (Exception e) {
+            return "{\"v\":1,\"notes\":[]}";
+        }
     }
 
     private static List<Note> seed() {
@@ -98,26 +150,8 @@ public final class NoteStore {
         return l;
     }
 
-    public static synchronized void saveAll(Context c, List<Note> list) {
-        JSONArray arr = new JSONArray();
-        try {
-            for (Note n : list) {
-                JSONObject o = new JSONObject();
-                o.put("id", n.id);
-                o.put("title", n.title);
-                o.put("color", n.color);
-                JSONArray it = new JSONArray();
-                for (Item x : n.items) {
-                    JSONObject j = new JSONObject();
-                    j.put("t", x.t);
-                    j.put("d", x.d);
-                    it.put(j);
-                }
-                o.put("items", it);
-                arr.put(o);
-            }
-        } catch (Exception ignored) {}
-        sp(c).edit().putString("list", arr.toString()).apply();
+    public static synchronized void saveRaw(Context c, List<Note> list) {
+        sp(c).edit().putString("list", toJson(list)).commit();
     }
 
     public static Note get(Context c, long id) {
@@ -125,35 +159,62 @@ public final class NoteStore {
         return null;
     }
 
-    /** Replaces the note with the same id, or adds it to the front. */
-    public static synchronized void put(Context c, Note note) {
-        List<Note> l = all(c);
-        for (int i = 0; i < l.size(); i++) {
-            if (l.get(i).id == note.id) {
-                l.set(i, note);
-                saveAll(c, l);
-                return;
-            }
+    /** Replaces the note with the same id, or adds it. Marks it changed and syncs. */
+    public static void put(Context c, Note note) {
+        synchronized (NoteStore.class) {
+            note.updated = System.currentTimeMillis();
+            note.deleted = false;
+            List<Note> l = raw(c);
+            boolean found = false;
+            for (int i = 0; i < l.size(); i++) if (l.get(i).id == note.id) { l.set(i, note); found = true; break; }
+            if (!found) l.add(note);
+            saveRaw(c, l);
         }
-        l.add(0, note);
-        saveAll(c, l);
+        Sync.soon(c);
     }
 
-    public static synchronized void delete(Context c, long id) {
-        List<Note> l = all(c);
-        l.removeIf(n -> n.id == id);
-        saveAll(c, l);
+    /** Deletes a note (kept as a small marker so the computer deletes it too). */
+    public static void delete(Context c, long id) {
+        synchronized (NoteStore.class) {
+            List<Note> l = raw(c);
+            for (Note n : l) if (n.id == id) {
+                n.deleted = true;
+                n.title = "";
+                n.items.clear();
+                n.updated = System.currentTimeMillis();
+            }
+            saveRaw(c, l);
+        }
+        Sync.soon(c);
     }
 
-    public static synchronized void setDone(Context c, long id, int idx, boolean done) {
-        List<Note> l = all(c);
-        for (Note n : l) {
-            if (n.id == id && idx >= 0 && idx < n.items.size()) {
-                n.items.get(idx).d = done;
-                saveAll(c, l);
-                return;
+    public static void setDone(Context c, long id, int idx, boolean done) {
+        synchronized (NoteStore.class) {
+            List<Note> l = raw(c);
+            for (Note n : l) {
+                if (n.id == id && idx >= 0 && idx < n.items.size()) {
+                    n.items.get(idx).d = done;
+                    n.updated = System.currentTimeMillis();
+                    saveRaw(c, l);
+                    break;
+                }
             }
         }
+        Sync.soon(c);
+    }
+
+    /** Newer change wins per note; deleted markers older than 60 days are dropped. */
+    public static List<Note> merge(List<Note> a, List<Note> b) {
+        java.util.Map<Long, Note> m = new java.util.HashMap<>();
+        for (Note n : a) m.put(n.id, n);
+        for (Note n : b) {
+            Note cur = m.get(n.id);
+            if (cur == null || n.updated > cur.updated) m.put(n.id, n);
+        }
+        long cutoff = System.currentTimeMillis() - 60L * 24 * 3600 * 1000;
+        List<Note> out = new ArrayList<>();
+        for (Note n : m.values()) if (!(n.deleted && n.updated < cutoff)) out.add(n);
+        return out;
     }
 
     public static int font(Context c) {
