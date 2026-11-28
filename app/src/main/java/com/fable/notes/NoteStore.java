@@ -99,7 +99,9 @@ public final class NoteStore {
     }
 
     /** Stable JSON (sorted by id) shared with the computer. */
-    public static String toJson(List<Note> list) {
+    public static String toJson(List<Note> list) { return toJson(list, -1, 0); }
+
+    public static String toJson(List<Note> list, int font, long fontUpdated) {
         List<Note> l = new ArrayList<>(list);
         l.sort((x, y) -> Long.compare(x.id, y.id));
         JSONArray arr = new JSONArray();
@@ -123,6 +125,7 @@ public final class NoteStore {
             }
             JSONObject root = new JSONObject();
             root.put("v", 1);
+            if (font >= 0) { root.put("font", font); root.put("fontUpdated", fontUpdated); }
             root.put("notes", arr);
             return root.toString();
         } catch (Exception e) {
@@ -163,7 +166,10 @@ public final class NoteStore {
     public static void put(Context c, Note note) {
         synchronized (NoteStore.class) {
             List<Note> l = raw(c);
-            for (Note x : l) if (x.id == note.id && !x.deleted && same(x, note)) return;   // unchanged: keep its time
+            for (Note x : l) {
+                if (x.id == note.id && !x.deleted && same(x, note)) return;            // unchanged: keep its time
+                if (x.id == note.id && x.deleted && x.updated > note.updated) return;  // deleted on the other device meanwhile
+            }
             note.updated = System.currentTimeMillis();
             note.deleted = false;
             boolean found = false;
@@ -231,8 +237,17 @@ public final class NoteStore {
     }
 
     public static void setFont(Context c, int f) {
-        sp(c).edit().putInt("font", f).apply();
+        sp(c).edit().putInt("font", f).putLong("fontUpdated", System.currentTimeMillis()).commit();
+        Sync.soon(c);
     }
+
+    /** Font chosen on the other device (keeps its time so it doesn't bounce back). */
+    static void setFontFromSync(Context c, int f, long when) {
+        if (f < 0 || f >= FONT_RES.length) return;
+        sp(c).edit().putInt("font", f).putLong("fontUpdated", when).commit();
+    }
+
+    public static long fontUpdated(Context c) { return sp(c).getLong("fontUpdated", 0); }
 
     public static Typeface hand(Context c, int f) {
         try { return c.getResources().getFont(FONT_RES[f]); } catch (Exception e) { return Typeface.DEFAULT; }

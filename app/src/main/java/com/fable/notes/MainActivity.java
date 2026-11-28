@@ -119,6 +119,7 @@ public class MainActivity extends Activity {
         syncStatus.setText(Sync.status(this));
         Sync.listener = () -> {
             syncStatus.setText(Sync.status(this));
+            buildChips();
             quiet = true;
             buildGrid();
             quiet = false;

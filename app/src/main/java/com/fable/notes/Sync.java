@@ -99,16 +99,28 @@ public final class Sync {
         String gid = sp(c).getString("gist", null);
         if (gid == null) gid = find(token);
 
-        List<NoteStore.Note> remote = new java.util.ArrayList<>();
+        String doc = null;
         if (gid != null) {
-            try { remote = NoteStore.parseList(fetch(token, gid)); }
-            catch (NotFound nf) { gid = find(token); if (gid != null) remote = NoteStore.parseList(fetch(token, gid)); }
+            try { doc = fetch(token, gid); }
+            catch (NotFound nf) { gid = find(token); if (gid != null) doc = fetch(token, gid); }
         }
+        List<NoteStore.Note> remote = doc == null ? new java.util.ArrayList<>() : NoteStore.parseList(doc);
+        int rFont = -1; long rFu = 0;
+        if (doc != null) try {
+            JSONObject root = new JSONObject(doc.trim());
+            rFont = root.optInt("font", -1); rFu = root.optLong("fontUpdated", 0);
+        } catch (Exception ignored) {}
+        int lFont = NoteStore.font(c); long lFu = NoteStore.fontUpdated(c);
+        int font = lFont; long fu = lFu;
+        if (rFont >= 0 && rFont < NoteStore.FONT_RES.length && rFu > lFu) { font = rFont; fu = rFu; }
+
         List<NoteStore.Note> merged = NoteStore.merge(NoteStore.raw(c), remote);
-        String mergedJson = NoteStore.toJson(merged);
+        String mergedJson = NoteStore.toJson(merged, font, fu);
         if (gid == null) gid = create(token, mergedJson);
-        else if (!mergedJson.equals(NoteStore.toJson(remote))) patch(token, gid, mergedJson);
+        else if (!mergedJson.equals(NoteStore.toJson(remote, rFont, rFu))) patch(token, gid, mergedJson);
         sp(c).edit().putString("gist", gid).apply();
+        boolean fontChanged = font != lFont;
+        if (fontChanged) NoteStore.setFontFromSync(c, font, fu);
 
         // apply locally (merging again in case something was edited while we were online)
         synchronized (NoteStore.class) {
@@ -117,7 +129,7 @@ public final class Sync {
             String a = NoteStore.toJson(m2);
             if (!a.equals(NoteStore.toJson(now))) { NoteStore.saveRaw(c, m2); return true; }
         }
-        return false;
+        return fontChanged;
     }
 
     private static String find(String token) throws IOException {

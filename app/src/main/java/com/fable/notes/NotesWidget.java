@@ -18,6 +18,7 @@ public class NotesWidget extends AppWidgetProvider {
     @Override
     public void onUpdate(Context c, AppWidgetManager m, int[] ids) {
         for (int id : ids) m.updateAppWidget(id, build(c, id));
+        Sync.soon(c);
     }
 
     @Override
@@ -83,6 +84,7 @@ public class NotesWidget extends AppWidgetProvider {
             int i = showIndex(c, wid, rv, NoteStore.index(c, wid) + 1);
             NoteStore.setIndex(c, wid, i);
             m.partiallyUpdateAppWidget(wid, rv);
+            Sync.soon(c);   // pick up changes from the computer while you're using the widget
         } else if ("toggle".equals(op)) {
             boolean checked = in.getBooleanExtra(RemoteViews.EXTRA_CHECKED, false);
             NoteStore.setDone(c, id, in.getIntExtra("idx", -1), checked);
