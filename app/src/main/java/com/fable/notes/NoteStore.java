@@ -162,15 +162,23 @@ public final class NoteStore {
     /** Replaces the note with the same id, or adds it. Marks it changed and syncs. */
     public static void put(Context c, Note note) {
         synchronized (NoteStore.class) {
+            List<Note> l = raw(c);
+            for (Note x : l) if (x.id == note.id && !x.deleted && same(x, note)) return;   // unchanged: keep its time
             note.updated = System.currentTimeMillis();
             note.deleted = false;
-            List<Note> l = raw(c);
             boolean found = false;
             for (int i = 0; i < l.size(); i++) if (l.get(i).id == note.id) { l.set(i, note); found = true; break; }
             if (!found) l.add(note);
             saveRaw(c, l);
         }
         Sync.soon(c);
+    }
+
+    static boolean same(Note a, Note b) {
+        if (!String.valueOf(a.title).equals(String.valueOf(b.title)) || a.color != b.color || a.items.size() != b.items.size()) return false;
+        for (int i = 0; i < a.items.size(); i++)
+            if (!String.valueOf(a.items.get(i).t).equals(String.valueOf(b.items.get(i).t)) || a.items.get(i).d != b.items.get(i).d) return false;
+        return true;
     }
 
     /** Deletes a note (kept as a small marker so the computer deletes it too). */
